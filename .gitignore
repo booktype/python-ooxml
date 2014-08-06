@@ -1,0 +1,12 @@
+#ignore these in git listings
+dist
+build
+*.pyc
+*~
+*.log
+.emacs*
+.DS_Store
+.swp
+\#*#
+.#*
+\#*
