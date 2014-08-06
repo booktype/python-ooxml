@@ -1,8 +1,7 @@
 About Python-OOXML
 ==================
 
-Python-OOXML is Python library for parsing .docx files.
-
+Python-OOXML is a Python library for parsing Office Open XML files.
 
 License
 =======
