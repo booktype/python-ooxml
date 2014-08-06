@@ -5,6 +5,7 @@
 .. moduleauthor:: Aleksandar Erkalovic <aerkalov@gmail.com>
 
 Hooks:
+
 * page_break
 * math
 * a
@@ -27,6 +28,7 @@ Hooks:
 """
 
 import os.path
+import six
 
 from lxml import etree
 from . import doc
@@ -305,7 +307,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
         if par.ilvl != ctx.ilvl or par.numid != ctx.numid:
             # start
-            if par.ilvl > ctx.ilvl:
+            if ctx.ilvl and (par.ilvl > ctx.ilvl):
                 fmt = _get_numbering(document, par.numid, par.ilvl)
 
                 if par.ilvl > 0:
@@ -321,7 +323,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
 
                 ctx.in_list.append((par.numid, par.ilvl))
-            elif par.ilvl < ctx.ilvl:
+            elif ctx.ilvl and par.ilvl < ctx.ilvl:
                 fmt = _get_numbering(document, ctx.numid, ctx.ilvl)
 
                 try:
@@ -336,7 +338,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 except:
                     pass
 
-            if par.numid > ctx.numid:
+            if ctx.numid and par.numid > ctx.numid:
                 if ctx.numid != None:   
                     # not sure about this
                     fmt = _get_numbering(document, par.numid, par.ilvl)
@@ -466,7 +468,7 @@ class Context:
 # Serialize style into CSS
 
 def serialize_styles(document):
-    for name, style in document.styles.iteritems():
+    for name, style in six.iteritems(document.styles):
         _css = ''
 
         based_style = style

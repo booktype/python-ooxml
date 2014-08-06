@@ -1,4 +1,5 @@
 import sys
+import six
 import logging
 
 from lxml import etree
@@ -13,5 +14,5 @@ if len(sys.argv) > 1:
 
     dfile = ooxml.read_from_file(file_name)
 
-    print serialize.serialize(dfile.document)
-    print serialize.serialize_styles(dfile.document)
+    six.print_(serialize.serialize(dfile.document))
+    six.print_(serialize.serialize_styles(dfile.document))

@@ -1,4 +1,5 @@
 import sys
+import six
 import logging
 
 from lxml import etree
@@ -16,8 +17,8 @@ if len(sys.argv) > 1:
     chapters = importer.get_chapters(dfile.document)
 
     for title, content in chapters:
-        print '===================================================================='
-        print title
-        print '===================================================================='
-        print content
+        six.print_('====================================================================')
+        six.print_(title)
+        six.print_('====================================================================')
+        six.print_(content)
 

@@ -1,4 +1,5 @@
 import unittest
+import six
 
 from mock import patch, call, Mock, MagicMock, ANY
 
@@ -82,7 +83,7 @@ class TestSerializeLinkElements(unittest.TestCase):
         elem = _create_elem([link])
 
         ret = serialize_link(context, self.doc, elem, self.root)
-        self.assertEqual(_render(ret), '<div><a href="http://www.google.com/">link</a></div>')
+        self.assertEqual(_render(ret), six.b('<div><a href="http://www.google.com/">link</a></div>'))
 
     @patch('ooxml.serialize.fire_hooks')
     @patch('ooxml.serialize.Context')    
@@ -121,7 +122,7 @@ class TestSerializeBreakElements(unittest.TestCase):
         instance.get_hook.return_value = None
 
         ret = serialize_break(instance, self.doc, None, self.root)
-        self.assertEqual(_render(ret), '<div><span style="page-break-after: always;"/></div>')
+        self.assertEqual(_render(ret), six.b('<div><span style="page-break-after: always;"/></div>'))
 
     @patch('ooxml.serialize.fire_hooks')
     @patch('ooxml.serialize.Context')    
@@ -147,8 +148,8 @@ class TestSerializeElements(unittest.TestCase):
         instance = MockContext.return_value
         instance.get_serializer.return_value = None
 
-        self.assertEqual(serialize_elements(self.doc, [1, 2, 3]), "<div/>\n")
-        self.assertEqual(serialize_elements(self.doc, []), "<div/>\n")
+        self.assertEqual(serialize_elements(self.doc, [1, 2, 3]), six.b("<div/>\n"))
+        self.assertEqual(serialize_elements(self.doc, []), six.b("<div/>\n"))
 
     @patch('ooxml.serialize.Context')
     def test_serialize_something(self, MockContext):
@@ -158,7 +159,7 @@ class TestSerializeElements(unittest.TestCase):
         instance = MockContext.return_value
         instance.get_serializer.return_value = _func
 
-        self.assertEqual(serialize_elements(self.doc, [1]), "<div>\n  <p/>\n</div>\n")
+        self.assertEqual(serialize_elements(self.doc, [1]), six.b("<div>\n  <p/>\n</div>\n"))
         instance.get_serializer.assert_called_with(1)
 
     @patch('ooxml.serialize.Context')

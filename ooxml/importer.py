@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import six
+
 HEADERS_IMPORTANCE = [
     ('heading 1', 'Title'),
     ('heading 2', 'Subtitle'),
@@ -97,13 +99,13 @@ def parse_html_string(s):
 
 def get_chapters(doc):
     from lxml import etree
-    import serialize
+    from . import serialize
 
     def _serialize_chapter(els):
         s =  serialize.serialize_elements(doc, els)
 
-        if s.startswith('<div/>'):
-            return ('', '<body></body>')
+        if s.startswith(six.b('<div/>')):
+            return ('', six.b('<body></body>'))
 
         root = parse_html_string(s[5:-6])
         body = root.find('.//body')
