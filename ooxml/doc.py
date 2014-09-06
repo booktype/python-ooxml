@@ -6,7 +6,6 @@
 
 """
 
-
 class Style(object):
     def __init__(self):
         self.reset()
@@ -25,6 +24,14 @@ class Document(object):
         super(Document, self).__init__()
 
         self.reset()
+
+    def add_style_as_used(self, name):
+        if name not in self.used_styles:
+            self.used_styles.append(name)
+
+    def add_font_as_used(self, sz):
+        fsz = int(sz) / 2
+        self.used_font_size[fsz] = self.used_font_size.setdefault(fsz, 0) + 1
 
     def get_style_by_name(self, name):
         return self.styles.get(name, None)
@@ -55,6 +62,9 @@ class Document(object):
         self.relationships = {}
         self.footnotes = {}
         self.styles = {}
+        self.default_style = None
+        self.used_styles = []
+        self.used_font_size = {}
 
 
 class Element(object):

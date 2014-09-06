@@ -29,6 +29,7 @@ def parse_previous_properties(doc, paragraph, prop):
 
     if style is not None:
         paragraph.rpr['style'] = style.attrib[_name('{{{w}}}val')]
+        doc.add_style_as_used(paragraph.rpr['style'])
 
     color = prop.find(_name('{{{w}}}color'))
 
@@ -44,13 +45,50 @@ def parse_previous_properties(doc, paragraph, prop):
 
     if sz is not None:
         paragraph.rpr['sz'] = sz.attrib[_name('{{{w}}}val')]
+        doc.add_font_as_used(paragraph.rpr['sz'])
 
+    # parse bold
     b = prop.find(_name('{{{w}}}b'))
 
     if b is not None:        
         # todo
         # check b = on and not off
         paragraph.rpr['b'] = True
+
+    # parse italic
+    i = prop.find(_name('{{{w}}}i'))
+
+    if i is not None:        
+        # todo
+        # check b = on and not off
+        paragraph.rpr['i'] = True
+
+    # parse underline
+    u = prop.find(_name('{{{w}}}u'))
+
+    if u is not None:        
+        # todo
+        # check b = on and not off
+        paragraph.rpr['u'] = True
+
+    # parse underline
+    strike = prop.find(_name('{{{w}}}strike'))
+
+    if strike is not None:        
+        # todo
+        # check b = on and not off
+        paragraph.rpr['strike'] = True
+
+    vert_align = prop.find(_name('{{{w}}}vertAlign'))
+
+    if vert_align is not None:
+        value = vert_align.attrib[_name('{{{w}}}val')]
+
+        if value == 'superscript':
+            paragraph.rpr['superscript'] = True
+
+        if value == 'subscript':
+            paragraph.rpr['subscript'] = True
 
 
 def parse_paragraph_properties(doc, paragraph, prop):
@@ -61,6 +99,7 @@ def parse_paragraph_properties(doc, paragraph, prop):
 
     if style is not None:
         paragraph.style_id = style.attrib[_name('{{{w}}}val')]
+        doc.add_style_as_used(paragraph.style_id)
 
     numpr = prop.find(_name('{{{w}}}numPr'))
 
@@ -115,7 +154,7 @@ def parse_alternate(document, container, elem):
     txtbx = elem.find('.//'+_name('{{{w}}}txbxContent'))
     paragraphs = []
 
-    if not txtbx:
+    if txtbx is None:
         return
 
     for el in txtbx:
@@ -260,6 +299,18 @@ def parse_relationship(document, xmlcontent):
 def parse_style(document, xmlcontent):
     styles = etree.fromstring(xmlcontent)
     document.styles = {}
+
+    default_rpr = styles.find(_name('{{{w}}}rPrDefault'))
+
+    _r = styles.xpath('.//w:rPrDefault', namespaces=NAMESPACES)
+
+    if len(_r) > 0:
+        rpr = _r[0].find(_name('{{{w}}}rPr'))
+
+        if rpr is not None:
+            st = doc.Style()
+            parse_previous_properties(document, st, rpr)
+            document.default_style = st
 
     for style in styles.xpath('.//w:style', namespaces=NAMESPACES):
         st = doc.Style()

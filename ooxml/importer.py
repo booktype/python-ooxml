@@ -1,35 +1,81 @@
 # -*- coding: utf-8 -*-
 
 import six
-
-HEADERS_IMPORTANCE = [
-    ('heading 1', 'Title'),
-    ('heading 2', 'Subtitle'),
-    ('heading 3', ),
-    ('heading 4', ),
-    ('heading 5', ),
-    ('heading 6', ),
-    ('heading 7', )
-]
+import collections
 
 def is_header(doc, name):
-    if name in ['heading 1', 'heading 2', 'heading 3', 'heading 4', 'heading 5', 'Title', 'Subtitle']:
+
+    if name == '':
         return True
+
+    default_font_size = 0
+
+    if doc.default_style:
+        if 'sz' in doc.default_style.rpr:
+            default_font_size = int(doc.default_style.rpr['sz']) / 2
+
+    for style_id in doc.used_styles:
+        style = doc.styles[style_id]        
+
+        if hasattr(style, 'rpr') and 'sz' in style.rpr:
+            font_size = int(style.rpr['sz']) / 2
+
+            if font_size <= default_font_size:
+                continue
+
+            if style.style_id == name:
+                return True
 
     return False
 
 
-def find_important(headers):
+def find_important(doc, headers):
+
+    default_font_size = 0
+
+    if doc.default_style:
+        if 'sz' in doc.default_style.rpr:
+            default_font_size = int(doc.default_style.rpr['sz']) / 2
 
     def _big_enough(block):
-        return block['weight'] > 100
+        return block['weight'] > 4
+
+    def _filter_font_sizes(sizes):
+        for sz, value in sizes:
+            if sz > default_font_size:
+                yield (sz, value)
+
+        return 
+
+    HEADERS_IMPORTANCE = [[el] for el in reversed(collections.OrderedDict(sorted(_filter_font_sizes(doc.used_font_size.items()), key=lambda t: t[0])))]
+
+    for style_id in doc.used_styles:
+        style = doc.styles[style_id]        
+
+        if hasattr(style, 'rpr') and 'sz' in style.rpr:
+            font_size = int(style.rpr['sz']) / 2
+
+            if font_size <= default_font_size:
+                continue
+
+            for i in range(len(HEADERS_IMPORTANCE)):
+                if HEADERS_IMPORTANCE[i][0] < font_size:
+                    if i == 0:
+                        HEADERS_IMPORTANCE = [[font_size]]+HEADERS_IMPORTANCE
+                    else:
+                        HEADERS_IMPORTANCE[i-1].append(style_id)
+                        break
+                elif HEADERS_IMPORTANCE[i][0] == font_size:
+                    HEADERS_IMPORTANCE[i].append(style_id)
 
     for hdrs in HEADERS_IMPORTANCE:
         lst = []       
 
         for header in headers:
-            if header['name'] in hdrs:
-                lst.append({'name': header['name'], 'weight': header['weight'], 'index': header['index']})
+            if header['name'] == '' and ('font_size' in header and header['font_size'] == hdrs[0]):
+                lst.append({'name': '', 'weight': header['weight'], 'index': header['index'], 'font_size': header['font_size']})
+            elif header['name'] != '' and header['name'] in hdrs[1:]:
+                lst.append({'name': header['name'], 'weight': header['weight'], 'index': header['index']})                
             else:
                 if len(lst) > 0:
                     lst[-1]['weight'] += header['weight']
@@ -48,7 +94,10 @@ def mark_headers(doc, markers):
 
     for style in markers:
         if is_header(doc, style['name']):
-            selected.append({'name': style['name'], 'index': style['index'], 'weight': style['weight']})
+            if style['name'] == '':
+                selected.append({'name': '', 'index': style['index'], 'weight': style['weight'], 'font_size': style['font_size']})
+            else:
+                selected.append({'name': style['name'], 'index': style['index'], 'weight': style['weight']})
         else:
             if len(selected) > 0:
                 selected[-1]['weight'] += style['weight']
@@ -57,7 +106,7 @@ def mark_headers(doc, markers):
 
 
 def mark_styles(doc, elements):
-    markers = [{'name': '', 'weight': 0, 'index': 0}]
+    markers = [{'name': '', 'weight': 0, 'index': 0, 'font_size': 0}]
 
     for pos, elem in enumerate(elements):
         try:
@@ -66,7 +115,12 @@ def mark_styles(doc, elements):
             style = None
 
         if style:
-            markers.append({'name': style.name, 'weight': 0, 'index': pos})
+            markers.append({'name': elem.style_id, 'weight': 0, 'index': pos})
+        else:
+            if hasattr(elem, 'rpr') and 'sz' in elem.rpr:
+                markers.append({'name': '', 'weight': 0, 'index': pos, 'font_size': int(elem.rpr['sz'])/2})
+
+        # check ovdje ako je mozda mozda header
 
         try:
             content = ''.join([e.value() for e in elem.elements])
@@ -82,8 +136,8 @@ def split_document(doc):
     markers = mark_styles(doc, doc.elements)
 
     headers = mark_headers(doc, markers)
-    
-    important = find_important(headers)
+
+    important = find_important(doc, headers)
 
     return important
 
@@ -139,7 +193,8 @@ def get_chapters(doc):
                 export_chapters.append(_serialize_chapter(doc.elements[:chapters[0]['index']-1]))
 
         for n in range(len(chapters)-1):
-            export_chapters.append(_serialize_chapter(doc.elements[chapters[n]['index']:chapters[n+1]['index']-1]))
+            _html = _serialize_chapter(doc.elements[chapters[n]['index']:chapters[n+1]['index']-1])
+            export_chapters.append(_html)
 
         export_chapters.append(_serialize_chapter(doc.elements[chapters[-1]['index']:]))
     else:

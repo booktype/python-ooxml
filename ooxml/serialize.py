@@ -138,12 +138,79 @@ def close_list(ctx, root):
         return None
 
 
+def open_list(ctx, document, par, root, elem):
+    _ls = None
+
+    if par.ilvl != ctx.ilvl or par.numid != ctx.numid:
+        # start
+
+        if ctx.ilvl is not None and (par.ilvl > ctx.ilvl):
+            fmt = _get_numbering(document, par.numid, par.ilvl)
+
+            if par.ilvl > 0:
+                # get last <li> in <ul>
+                # could be nicer
+                _b = list(root)[-1]
+                _ls = etree.SubElement(_b, _get_numbering_tag(fmt))
+                root = _ls
+            else:
+                _ls = etree.SubElement(root, _get_numbering_tag(fmt))
+                root = _ls
+
+            fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
+
+            ctx.in_list.append((par.numid, par.ilvl))
+        elif ctx.ilvl is not None and par.ilvl < ctx.ilvl:
+            fmt = _get_numbering(document, ctx.numid, ctx.ilvl)
+
+            try:
+                while True:
+                    numid, ilvl = ctx.in_list[-1]
+
+                    if numid == par.numid and ilvl == par.ilvl:
+                        break
+
+                    root = _get_parent(root)
+                    ctx.in_list.pop()
+            except:
+                pass
+
+#        if ctx.numid is not None and par.numid > ctx.numid:
+#            if ctx.numid != None:   
+        if par.numid > ctx.numid:
+            fmt = _get_numbering(document, par.numid, par.ilvl)
+            _ls = etree.SubElement(root, _get_numbering_tag(fmt))
+            fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
+
+            ctx.in_list.append((par.numid, par.ilvl))
+            root = _ls
+                
+    ctx.ilvl = par.ilvl
+    ctx.numid = par.numid
+
+    _a = etree.SubElement(root, 'li')
+    _a.text = elem.text
+
+    for a in list(elem):
+        _a.append(a)
+
+    fire_hooks(ctx, document, _a, ctx.get_hook('li'))
+
+    return root
+    
+
 def fire_hooks(ctx, document, element, hooks):
     if not hooks:
         return
 
     for hook in hooks:
         hook(ctx, document, element)
+
+
+def has_style(node):
+    elements = ['b', 'i', 'u', 'strike', 'color', 'jc', 'sz', 'ind', 'superscript', 'subscript']
+
+    return any([True for elem in elements if elem in node.rpr])
 
 
 def get_style(node):
@@ -157,6 +224,12 @@ def get_style(node):
 
     if 'i' in node.rpr:
         style.append('font-style: italic')
+
+    if 'u' in node.rpr:
+        style.append('text-decoration: underline')
+
+    if 'strike' in node.rpr:
+        style.append('text-decoration: line-through')
 
     if 'color' in node.rpr:
         if node.rpr['color'] != '000000':
@@ -203,83 +276,78 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
     if style:
         elem.set('data-style', par.style_id)
         
-    for el in par.elements:   
-        if isinstance(el, doc.TextBox):
-            ctx.get_serializer(el)(ctx, document, el, elem)
+    for el in par.elements:
+        _serializer =  ctx.get_serializer(el)
 
-        if isinstance(el, doc.Break):
-            ctx.get_serializer(el)(ctx, document, el, elem)
-
-        if isinstance(el, doc.Math):
-            # this is just wrong
-            # must go trough each element and serialize it separately            
-            ctx.get_serializer(el)(ctx, document, el, elem)
-
-        if isinstance(el, doc.Link):
-            # this is just wrong
-            # must go trough each element and serialize it separately            
-            ctx.get_serializer(el)(ctx, document, el, elem)
+        if _serializer:
+            _serializer(ctx, document, el, elem)
 
         if isinstance(el, doc.Text):
-            _style = get_style(el)
+            children = list(elem)
+            _text_style = get_style(el)
 
-            if _style != '':
-                # check if it is the same style
-                # and then just add at the end
-                _s = None
-                children = list(elem)
+            if 'superscript' in el.rpr:
+                new_element = etree.Element('sup')
+                new_element.text = el.value()
+            elif 'subscript' in el.rpr:
+                new_element = etree.Element('sub')
+                new_element.text = el.value()               
+            elif 'b' in el.rpr or 'i' in el.rpr or 'u' in el.rpr:                
+                new_element = None
+                _element = None
 
-                if len(children) > 0:
-                    _s = children[-1].get('style')
+                def _add_formatting(f, new_element, _element):
+                    if f in el.rpr:
+                        _t = etree.Element(f)
 
-                if _s == _style:
-                    txt = children[-1].text or ''
-                    # this extra space is creating problems
-                    children[-1].text = u'{} {}'.format(txt, el.value())
-                else:
-                    span = etree.SubElement(elem, 'span')
-                    span.text = el.value()                    
-                    span.set('style', _style)                
+                        if new_element is not None:
+                            _element.append(_t)
+                            _element = _t
+                        else:
+                            new_element = _t
+                            _element = new_element
+
+                    return new_element, _element
+
+                new_element, _element = _add_formatting('b', new_element, _element)
+                new_element, _element = _add_formatting('i', new_element, _element)
+                new_element, _element = _add_formatting('u', new_element, _element)
+                
+                _element.text = el.value()
             else:
-                children = list(elem)
+                new_element = etree.Element('span')
+                new_element.text = el.value()
 
-                if len(children) == 0:   
+            if _text_style != '':
+                new_element.set('style', _text_style)
+            else:
+                new_element.set('class', 'noformat')
+
+            was_inserted = False
+
+
+            if len(children) > 0:
+                _child_style = children[-1].get('style') or ''
+
+                if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail == '':
+                    txt = children[-1].text or ''
+                    children[-1].text = u'{}{}'.format(txt, new_element.text)                    
+                    was_inserted = True
+
+                if _style == '' and _text_style == '' and new_element.tag == 'span':
+                    _e = children[-1]
+
+                    txt = _e.tail or ''
+                    _e.tail = u'{}{}'.format(txt, new_element.text)
+                    was_inserted = True
+
+            if not was_inserted:
+                if _style == '' and _text_style == '' and new_element.tag == 'span' and elem.tail == '':
                     txt = elem.text or ''
-                    # TODO
-                    # extra space here
-                    elem.text = u'{} {}'.format(txt, el.value())
+                    elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
-                    txt = children[-1].tail or ''
-                    children[-1].tail = u'{} {}'.format(txt, el.value())
+                    elem.append(new_element)
     
-        if isinstance(el, doc.Image):
-            ctx.get_serializer(el)(ctx, document, el, elem)
-
-        if isinstance(el, doc.Footnote):
-            p_foot = document.footnotes[el.rid]
-
-            p = etree.Element('p')
-            foot_doc = serialize_paragraph(ctx, document, p_foot, p)
-            # must put content of the footter somewhere
-            footnote_num = el.rid
-
-            if el.rid not in ctx.footnote_list:
-                ctx.footnote_id += 1
-                ctx.footnote_list[el.rid] = ctx.footnote_id
-
-            footnote_num = ctx.footnote_list[el.rid]
-
-            note = etree.SubElement(elem, 'sup')
-            link = etree.SubElement(note, 'a')
-            link.set('href', '#')
-            link.text = u'{}'.format(footnote_num)
-
-            fire_hooks(ctx, document, note, ctx.get_hook('footnote'))
-
-        if isinstance(el, doc.Symbol):
-            span = etree.SubElement(elem, 'span')
-            span.text = el.value()
-
     if style:
         try:
             # style_id can be none
@@ -292,82 +360,64 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         # - missing list of heading styles somehwhere
         if style.name in ['heading 1', 'Title']:
             elem.tag = 'h1'
-            root.append(elem)
+            if root is not None:
+                root.append(elem)
 
             return root
 
         if style.name in ['heading 2', 'Subtitle']:
             elem.tag = 'h2'
-            root.append(elem)
+            if root is not None:
+                root.append(elem)
 
             return root
 
-    if par.ilvl != None:
-        _ls = None
-
-        if par.ilvl != ctx.ilvl or par.numid != ctx.numid:
-            # start
-            if ctx.ilvl and (par.ilvl > ctx.ilvl):
-                fmt = _get_numbering(document, par.numid, par.ilvl)
-
-                if par.ilvl > 0:
-                    # get last <li> in <ul>
-                    # could be nicer
-                    _b = list(root)[-1]
-                    _ls = etree.SubElement(_b, _get_numbering_tag(fmt))
-                    root = _ls
-                else:
-                    _ls = etree.SubElement(root, _get_numbering_tag(fmt))
-                    root = _ls
-
-                fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
-
-                ctx.in_list.append((par.numid, par.ilvl))
-            elif ctx.ilvl and par.ilvl < ctx.ilvl:
-                fmt = _get_numbering(document, ctx.numid, ctx.ilvl)
-
-                try:
-                    while True:
-                        numid, ilvl = ctx.in_list[-1]
-
-                        if numid == par.numid and ilvl == par.ilvl:
-                            break
-
-                        root = _get_parent(root)
-                        ctx.in_list.pop()
-                except:
-                    pass
-
-            if ctx.numid and par.numid > ctx.numid:
-                if ctx.numid != None:   
-                    # not sure about this
-                    fmt = _get_numbering(document, par.numid, par.ilvl)
-                    _ls = etree.SubElement(root, _get_numbering_tag(fmt))
-                    fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
-
-                    ctx.in_list.append((par.numid, par.ilvl))
-                    root = _ls
-                    
-        ctx.ilvl = par.ilvl
-        ctx.numid = par.numid
-
-        _a = etree.SubElement(root, 'li')
-        _a.text = elem.text
-
-        for a in list(elem):
-            _a.append(a)
-
-        fire_hooks(ctx, document, _a, ctx.get_hook('li'))
-
+    # Indentation is different. We are starting or closing list.
+    if par.ilvl != None:        
+        root = open_list(ctx, document, par, root, elem)
         return root
     else:
         root = close_list(ctx, root)
         ctx.ilvl, ctx.numid = None, None
 
+    # Add new elements to our root element.
     if root is not None:
         root.append(elem)
 
     fire_hooks(ctx, document, elem, ctx.get_hook('p'))
+
+    return root
+
+
+def serialize_symbol(ctx, document, el, root):
+    span = etree.SubElement(root, 'span')
+    span.text = el.value()
+
+    fire_hooks(ctx, document, span, ctx.get_hook('symbol'))
+
+    return root
+
+
+def serialize_footnote(ctx, document, el, root):
+    p_foot = document.footnotes[el.rid]
+
+    p = etree.Element('p')
+    foot_doc = serialize_paragraph(ctx, document, p_foot, p)
+    # must put content of the footter somewhere
+    footnote_num = el.rid
+
+    if el.rid not in ctx.footnote_list:
+        ctx.footnote_id += 1
+        ctx.footnote_list[el.rid] = ctx.footnote_id
+
+    footnote_num = ctx.footnote_list[el.rid]
+
+    note = etree.SubElement(root, 'sup')
+    link = etree.SubElement(note, 'a')
+    link.set('href', '#')
+    link.text = u'{}'.format(footnote_num)
+
+    fire_hooks(ctx, document, note, ctx.get_hook('footnote'))
 
     return root
 
@@ -425,7 +475,9 @@ DEFAULT_OPTIONS = {
         doc.Image: serialize_image,
         doc.Math: serialize_math,
         doc.Break: serialize_break,
-        doc.TextBox: serialize_textbox
+        doc.TextBox: serialize_textbox,
+        doc.Footnote: serialize_footnote,
+        doc.Symbol: serialize_symbol
     },
 
     'hooks': {}
