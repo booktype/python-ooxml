@@ -19,6 +19,7 @@ Hooks:
 * tr
 * table
 * textbox 
+* h
 
 .. code-block:: python
 
@@ -29,6 +30,7 @@ Hooks:
 
 import os.path
 import six
+import collections
 
 from lxml import etree
 from . import doc
@@ -71,7 +73,7 @@ def serialize_break(ctx, document, elem, root):
     _div = etree.SubElement(root, 'span')
     _div.set('style', 'page-break-after: always;')
 
-    fire_hooks(ctx, document, _div, ctx.get_hook('page_break'))
+    fire_hooks(ctx, document, elem, _div, ctx.get_hook('page_break'))
 
     return root
 
@@ -81,7 +83,7 @@ def serialize_math(ctx, document, elem, root):
     _div.set('style', 'border: 1px solid red')
     _div.text = 'We do not support Math blocks at the moment.'
 
-    fire_hooks(ctx, document, _div, ctx.get_hook('math'))
+    fire_hooks(ctx, document, elem, _div, ctx.get_hook('math'))
 
     return root
 
@@ -93,7 +95,7 @@ def serialize_link(ctx, document, elem, root):
         _a.text = elem.elements[0].value()
     _a.set('href', document.relationships[elem.rid]['target'])
 
-    fire_hooks(ctx, document, _a, ctx.get_hook('a'))
+    fire_hooks(ctx, document, elem, _a, ctx.get_hook('a'))
 
     return root
 
@@ -107,7 +109,7 @@ def serialize_image(ctx, document, elem, root):
     # make path configurable
     _img.set('src', 'static/{}{}'.format(elem.rid, img_extension))
 
-    fire_hooks(ctx, document, _img, ctx.get_hook('img'))
+    fire_hooks(ctx, document, elem, _img, ctx.get_hook('img'))
 
     return root
 
@@ -157,7 +159,7 @@ def open_list(ctx, document, par, root, elem):
                 _ls = etree.SubElement(root, _get_numbering_tag(fmt))
                 root = _ls
 
-            fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
+            fire_hooks(ctx, document, par, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
 
             ctx.in_list.append((par.numid, par.ilvl))
         elif ctx.ilvl is not None and par.ilvl < ctx.ilvl:
@@ -180,7 +182,7 @@ def open_list(ctx, document, par, root, elem):
         if par.numid > ctx.numid:
             fmt = _get_numbering(document, par.numid, par.ilvl)
             _ls = etree.SubElement(root, _get_numbering_tag(fmt))
-            fire_hooks(ctx, document, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
+            fire_hooks(ctx, document, par, _ls, ctx.get_hook(_get_numbering_tag(fmt)))
 
             ctx.in_list.append((par.numid, par.ilvl))
             root = _ls
@@ -194,17 +196,17 @@ def open_list(ctx, document, par, root, elem):
     for a in list(elem):
         _a.append(a)
 
-    fire_hooks(ctx, document, _a, ctx.get_hook('li'))
+    fire_hooks(ctx, document, par, _a, ctx.get_hook('li'))
 
     return root
     
 
-def fire_hooks(ctx, document, element, hooks):
+def fire_hooks(ctx, document, elem, element, hooks):
     if not hooks:
         return
 
     for hook in hooks:
-        hook(ctx, document, element)
+        hook(ctx, document, elem, element)
 
 
 def has_style(node):
@@ -213,20 +215,22 @@ def has_style(node):
     return any([True for elem in elements if elem in node.rpr])
 
 
-def get_style(node):
+def get_style_css(node, embed=True):
     style = []
 
     if not node:
         return
 
-    if 'b' in node.rpr:
-        style.append('font-weight: bold')
+    # temporarily
+    if not embed:
+        if 'b' in node.rpr:
+            style.append('font-weight: bold')
 
-    if 'i' in node.rpr:
-        style.append('font-style: italic')
+        if 'i' in node.rpr:
+            style.append('font-style: italic')
 
-    if 'u' in node.rpr:
-        style.append('text-decoration: underline')
+        if 'u' in node.rpr:
+            style.append('text-decoration: underline')
 
     if 'strike' in node.rpr:
         style.append('text-decoration: line-through')
@@ -258,23 +262,43 @@ def get_style(node):
     return '; '.join(style) + ';'
 
 
-def serialize_paragraph(ctx, document, par, root, embed=True):
+def get_style(document, elem):
     try:
-        # style_id can be none
-        style = document.styles[par.style_id]
+        return document.styles.get_by_id(elem.style_id)
     except AttributeError:
-        style = None
+        return None
+
+
+def get_style_name(style):
+    return style.style_id
+
+
+def get_css_classes(document, style):
+    classes = []
+
+    while True:
+        classes.insert(0, get_style_name(style))
+
+        if style.based_on:
+            style = document.styles.get_by_id(style.based_on)
+        else:
+            break
+
+    return ' '.join(classes)
+
+
+def serialize_paragraph(ctx, document, par, root, embed=True):
+    style = get_style(document, par)
 
     elem = etree.Element('p')
 
-    _style = get_style(par)
+    _style = get_style_css(par)
 
-    if _style != '':
-        elem.set('style', _style)
+    # if _style != '':
+    #     elem.set('style', _style)
 
-    # This is just for debugging purposes at the moment
     if style:
-        elem.set('data-style', par.style_id)
+        elem.set('class', get_css_classes(document, style))
         
     for el in par.elements:
         _serializer =  ctx.get_serializer(el)
@@ -284,7 +308,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
         if isinstance(el, doc.Text):
             children = list(elem)
-            _text_style = get_style(el)
+            _text_style = get_style_css(el)
 
             if 'superscript' in el.rpr:
                 new_element = etree.Element('sup')
@@ -321,6 +345,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             if _text_style != '':
                 new_element.set('style', _text_style)
             else:
+                # maybe we don't need this
                 new_element.set('class', 'noformat')
 
             was_inserted = False
@@ -328,8 +353,8 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             if len(children) > 0:
                 _child_style = children[-1].get('style') or ''
-
-                if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail == '':
+                
+                if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail is None:
                     txt = children[-1].text or ''
                     children[-1].text = u'{}{}'.format(txt, new_element.text)                    
                     was_inserted = True
@@ -342,34 +367,21 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                     was_inserted = True
 
             if not was_inserted:
-                if _style == '' and _text_style == '' and new_element.tag == 'span' and elem.tail == '':
+                if _style == '' and _text_style == '' and new_element.tag == 'span':
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
                     elem.append(new_element)
     
     if style:
-        try:
-            # style_id can be none
-            style2 = document.styles.get(style.based_on, None)
-        except AttributeError:
-            style2 = None        
-
         # todo:
-        # - missing fire hook for heading
         # - missing list of heading styles somehwhere
-        if style.name in ['heading 1', 'Title']:
-            elem.tag = 'h1'
+        if ctx.header.is_header(style, elem):
+            elem.tag = ctx.header.get_header(style, elem)
             if root is not None:
                 root.append(elem)
 
-            return root
-
-        if style.name in ['heading 2', 'Subtitle']:
-            elem.tag = 'h2'
-            if root is not None:
-                root.append(elem)
-
+            fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
             return root
 
     # Indentation is different. We are starting or closing list.
@@ -384,7 +396,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
     if root is not None:
         root.append(elem)
 
-    fire_hooks(ctx, document, elem, ctx.get_hook('p'))
+    fire_hooks(ctx, document, par, elem, ctx.get_hook('p'))
 
     return root
 
@@ -393,7 +405,7 @@ def serialize_symbol(ctx, document, el, root):
     span = etree.SubElement(root, 'span')
     span.text = el.value()
 
-    fire_hooks(ctx, document, span, ctx.get_hook('symbol'))
+    fire_hooks(ctx, document, el, span, ctx.get_hook('symbol'))
 
     return root
 
@@ -417,7 +429,7 @@ def serialize_footnote(ctx, document, el, root):
     link.set('href', '#')
     link.text = u'{}'.format(footnote_num)
 
-    fire_hooks(ctx, document, note, ctx.get_hook('footnote'))
+    fire_hooks(ctx, document, el, note, ctx.get_hook('footnote'))
 
     return root
 
@@ -442,11 +454,11 @@ def serialize_table(ctx, document, table, root):
             root = close_list(ctx, root)
             ctx.ilvl, ctx.numid = None, None
 
-            fire_hooks(ctx, document, _td, ctx.get_hook('td'))
+            fire_hooks(ctx, document, table, _td, ctx.get_hook('td'))
 
-        fire_hooks(ctx, document, _td, ctx.get_hook('tr'))
+        fire_hooks(ctx, document, table, _td, ctx.get_hook('tr'))
 
-    fire_hooks(ctx, document, _table, ctx.get_hook('table'))
+    fire_hooks(ctx, document, table, _table, ctx.get_hook('table'))
 
     return root    
 
@@ -461,9 +473,73 @@ def serialize_textbox(ctx, document, txtbox, root):
         if _ser:
             _ser(ctx, document, elem, _div)
 
-    fire_hooks(ctx, document, _div, ctx.get_hook('textbox'))
+    fire_hooks(ctx, document, txtbox, _div, ctx.get_hook('textbox'))
 
     return root
+
+# Header Context
+
+class HeaderContext:
+    def __init__(self):
+        self.doc = None
+
+        self.default_font_size = 0
+        self.headers_sizes = []
+
+    def init(self, doc):
+        self.doc = doc
+
+        default_font_size = 0
+
+        if doc.default_style:
+            if 'sz' in doc.default_style.rpr:
+                default_font_size = int(doc.default_style.rpr['sz']) / 2
+
+        def _filter_font_sizes(sizes):
+            for sz, value in sizes:
+                if sz > default_font_size:
+                    yield (sz, value)
+
+            return 
+
+        self.header_sizes = [[el] for el in reversed(collections.OrderedDict(sorted(_filter_font_sizes(doc.used_font_size.items()), key=lambda t: t[0])))]
+
+        for style_id in doc.used_styles:
+            style = doc.styles.get_by_id(style_id)
+
+            if hasattr(style, 'rpr') and 'sz' in style.rpr:
+                font_size = int(style.rpr['sz']) / 2
+
+                if font_size <= default_font_size:
+                    continue
+
+                for i in range(len(self.header_sizes)):
+                    if self.header_sizes[i][0] < font_size:
+                        if i == 0:
+                            self.header_sizes = [[font_size]]+self.header_sizes
+                        else:
+                            self.header_sizes[i-1].append(style_id)
+                            break
+                    elif self.header_sizes[i][0] == font_size:
+                        self.header_sizes[i].append(style_id)
+
+    def is_header(self, style, node):
+        for st in self.header_sizes:
+            if style:
+                if style.style_id in st:
+                    return True
+
+        return False        
+
+    def get_header(self, style, node):
+        for idx, st in enumerate(self.header_sizes):
+            if style:
+                if style.style_id in st:
+                    n = idx + 1
+                    if n > 6:
+                        n = 6
+                    return 'h{}'.format(n)
+
 
 # Default options
 
@@ -480,12 +556,13 @@ DEFAULT_OPTIONS = {
         doc.Symbol: serialize_symbol
     },
 
-    'hooks': {}
+    'hooks': {},
+    'header': HeaderContext
 }
 
 
 class Context:
-    def __init__(self, options=None):
+    def __init__(self, document,options=None):
         self.options = dict(DEFAULT_OPTIONS)
 
         if options:
@@ -495,7 +572,11 @@ class Context:
             if 'hooks' in options:
                 self.options['hooks'].update(options['hooks'])
 
+            if 'header' in options:
+                self.options['header'] = options['header']
+
         self.reset()
+        self.header.init(document)
 
     def get_hook(self, name):
         return self.options['hooks'].get(name, None)
@@ -516,29 +597,30 @@ class Context:
         self.footnote_list = {}
 
         self.in_list = []
+        self.header = self.options['header']()
 
 # Serialize style into CSS
 
 def serialize_styles(document):
-    for name, style in six.iteritems(document.styles):
+    for name, style in six.iteritems(document.styles.styles):
         _css = ''
 
         based_style = style
 
         while True:
             try:
-                based_style = document.styles[based_style.based_on]
-                _css = get_style(based_style) + _css
+                based_style = document.styles.get_by_id(based_style.based_on)
+                _css = get_style_css(based_style) + _css
             except:
                 break
 
-        _css += get_style(style)
+        _css += get_style_css(style)
 
 
 # Serialize list of elements into HTML
 
 def serialize_elements(document, elements, options=None):
-    ctx = Context(options)
+    ctx = Context(document, options)
 
     tree_root = root = etree.Element('div')
 

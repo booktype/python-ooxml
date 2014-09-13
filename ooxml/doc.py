@@ -12,11 +12,38 @@ class Style(object):
 
     def reset(self):
         self.style_id = ''
+        self.style_type = ''
+        self.is_default = False
         self.named = ''
         self.based_on = ''
 
         self.rpr = {}
         self.ppr = {}
+
+
+class StylesCollection:
+    def __init__(self):
+        self.reset()
+
+    def get_by_name(self, name, style_type = None):
+        st = self.styles.get(style_id, None)
+        if style_type and not st:
+            st = self.styles.get(self.default_style[style_type], None)
+        return st
+
+    def get_by_id(self, style_id, style_type = None):
+        for st in self.styles.values():
+            if st:
+                if st.style_id == style_id:
+                    return st
+
+        if style_type:
+            return self.styles.get(self.default_style[style_type], None)
+        return None
+    
+    def reset(self):
+        self.styles = {}
+        self.default_styles = {}
 
 
 class Document(object):
@@ -32,17 +59,6 @@ class Document(object):
     def add_font_as_used(self, sz):
         fsz = int(sz) / 2
         self.used_font_size[fsz] = self.used_font_size.setdefault(fsz, 0) + 1
-
-    def get_style_by_name(self, name):
-        return self.styles.get(name, None)
-
-    def get_style_by_id(self, style_id):
-        for st in self.styles.values():
-            if st:
-                if st.style_id == style_id:
-                    return st
-
-        return None
 
     def get_styles(self, name):
         styles = []
@@ -61,7 +77,7 @@ class Document(object):
         self.elements = []
         self.relationships = {}
         self.footnotes = {}
-        self.styles = {}
+        self.styles = StylesCollection()
         self.default_style = None
         self.used_styles = []
         self.used_font_size = {}

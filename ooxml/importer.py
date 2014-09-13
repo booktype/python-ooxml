@@ -15,7 +15,7 @@ def is_header(doc, name):
             default_font_size = int(doc.default_style.rpr['sz']) / 2
 
     for style_id in doc.used_styles:
-        style = doc.styles[style_id]        
+        style = doc.styles.get_by_id(style_id)
 
         if hasattr(style, 'rpr') and 'sz' in style.rpr:
             font_size = int(style.rpr['sz']) / 2
@@ -50,7 +50,7 @@ def find_important(doc, headers):
     HEADERS_IMPORTANCE = [[el] for el in reversed(collections.OrderedDict(sorted(_filter_font_sizes(doc.used_font_size.items()), key=lambda t: t[0])))]
 
     for style_id in doc.used_styles:
-        style = doc.styles[style_id]        
+        style = doc.styles.get_by_id(style_id)
 
         if hasattr(style, 'rpr') and 'sz' in style.rpr:
             font_size = int(style.rpr['sz']) / 2
@@ -110,7 +110,7 @@ def mark_styles(doc, elements):
 
     for pos, elem in enumerate(elements):
         try:
-            style = doc.styles[elem.style_id]
+            style = doc.styles.get_by_id(elem.style_id)
         except AttributeError:
             style = None
 

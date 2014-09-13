@@ -298,8 +298,8 @@ def parse_relationship(document, xmlcontent):
 
 def parse_style(document, xmlcontent):
     styles = etree.fromstring(xmlcontent)
-    document.styles = {}
 
+    # parse default styles
     default_rpr = styles.find(_name('{{{w}}}rPrDefault'))
 
     _r = styles.xpath('.//w:rPrDefault', namespaces=NAMESPACES)
@@ -312,10 +312,20 @@ def parse_style(document, xmlcontent):
             parse_previous_properties(document, st, rpr)
             document.default_style = st
 
+    # rest of the styles
     for style in styles.xpath('.//w:style', namespaces=NAMESPACES):
         st = doc.Style()
 
         st.style_id = style.attrib[_name('{{{w}}}styleId')]
+
+        style_type = style.attrib[_name('{{{w}}}type')]        
+        if style_type is not None:
+            st.style_type = style_type
+
+        if _name('{{{w}}}default') in style.attrib:
+            is_default = style.attrib[_name('{{{w}}}default')]
+            if is_default is not None:
+                st.is_default = is_default == '1'
 
         name = style.find(_name('{{{w}}}name'))
         if name is not None:
@@ -326,7 +336,10 @@ def parse_style(document, xmlcontent):
         if based_on is not None:
             st.based_on = based_on.attrib[_name('{{{w}}}val')]
 
-        document.styles[st.style_id] = st
+        document.styles.styles[st.style_id] = st
+
+        if st.is_default:
+            document.styles.default_styles[st.style_type] = st.style_id
 
         rpr = style.find(_name('{{{w}}}rPr'))
 
