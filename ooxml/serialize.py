@@ -215,6 +215,12 @@ def has_style(node):
     return any([True for elem in elements if elem in node.rpr])
 
 
+def get_style_fontsize(node):
+    if 'sz' in node.rpr:
+        return int(node.rpr['sz']) / 2
+
+    return 0
+
 def get_style_css(node, embed=True):
     style = []
 
@@ -273,7 +279,7 @@ def get_style_name(style):
     return style.style_id
 
 
-def get_css_classes(document, style):
+def get_all_styles(document, style):
     classes = []
 
     while True:
@@ -284,7 +290,11 @@ def get_css_classes(document, style):
         else:
             break
 
-    return ' '.join(classes)
+    return classes
+
+
+def get_css_classes(document, style):
+    return ' '.join([st.lower() for st in get_all_styles(document, style)])
 
 
 def serialize_paragraph(ctx, document, par, root, embed=True):
@@ -294,11 +304,13 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
     _style = get_style_css(par)
 
-    # if _style != '':
-    #     elem.set('style', _style)
+    if _style != '':
+        elem.set('style', _style)
 
     if style:
         elem.set('class', get_css_classes(document, style))
+
+    max_font_size = get_style_fontsize(par)
         
     for el in par.elements:
         _serializer =  ctx.get_serializer(el)
@@ -309,6 +321,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         if isinstance(el, doc.Text):
             children = list(elem)
             _text_style = get_style_css(el)
+
+            if get_style_fontsize(el) > max_font_size:
+                max_font_size = get_style_fontsize(el)
 
             if 'superscript' in el.rpr:
                 new_element = etree.Element('sup')
@@ -356,7 +371,8 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 
                 if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail is None:
                     txt = children[-1].text or ''
-                    children[-1].text = u'{}{}'.format(txt, new_element.text)                    
+                    txt2 = new_element.text or ''
+                    children[-1].text = u'{}{}'.format(txt, txt2)  
                     was_inserted = True
 
                 if _style == '' and _text_style == '' and new_element.tag == 'span':
@@ -383,6 +399,17 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
             return root
+    else:
+        if max_font_size > ctx.header.default_font_size:
+            if ctx.header.is_header(max_font_size, elem):
+                if elem.text != '' and len(list(elem)) != 0:
+                    elem.tag = ctx.header.get_header(max_font_size, elem)
+
+                    if root is not None:
+                        root.append(elem)
+
+                    fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
+                    return root
 
     # Indentation is different. We are starting or closing list.
     if par.ilvl != None:        
@@ -439,6 +466,11 @@ def serialize_table(ctx, document, table, root):
     _table.set('border', '1')
     _table.set('width', '100%')
 
+    style = get_style(document, table)
+
+    if style:
+        _table.set('class', get_css_classes(document, style))
+
     for rows in table.rows:
         _tr = etree.SubElement(_table, 'tr')
 
@@ -489,15 +521,12 @@ class HeaderContext:
     def init(self, doc):
         self.doc = doc
 
-        default_font_size = 0
-
         if doc.default_style:
-            if 'sz' in doc.default_style.rpr:
-                default_font_size = int(doc.default_style.rpr['sz']) / 2
+            self.default_font_size = get_style_fontsize(doc.default_style)
 
         def _filter_font_sizes(sizes):
             for sz, value in sizes:
-                if sz > default_font_size:
+                if sz > self.default_font_size:
                     yield (sz, value)
 
             return 
@@ -510,7 +539,7 @@ class HeaderContext:
             if hasattr(style, 'rpr') and 'sz' in style.rpr:
                 font_size = int(style.rpr['sz']) / 2
 
-                if font_size <= default_font_size:
+                if font_size <= self.default_font_size:
                     continue
 
                 for i in range(len(self.header_sizes)):
@@ -526,19 +555,32 @@ class HeaderContext:
     def is_header(self, style, node):
         for st in self.header_sizes:
             if style:
-                if style.style_id in st:
-                    return True
+                if hasattr(style, 'style_id'):
+                    if style.style_id in st:
+                        return True
+                else:
+                    if style in st:
+                        return True
 
         return False        
+
 
     def get_header(self, style, node):
         for idx, st in enumerate(self.header_sizes):
             if style:
-                if style.style_id in st:
-                    n = idx + 1
-                    if n > 6:
-                        n = 6
-                    return 'h{}'.format(n)
+                if hasattr(style, 'style_id'):
+                    if style.style_id in st:
+                        n = idx + 1
+                        if n > 6:
+                            n = 6
+                        return 'h{}'.format(n)
+                else:
+                    if style in st:
+                        n = idx + 1
+                        if n > 6:
+                            n = 6
+                        return 'h{}'.format(n)
+
 
 
 # Default options
@@ -601,21 +643,44 @@ class Context:
 
 # Serialize style into CSS
 
-def serialize_styles(document):
-    for name, style in six.iteritems(document.styles.styles):
-        _css = ''
+def serialize_styles(document, prefix=''):
+    all_styles = []
+    css_content = ''
 
-        based_style = style
+    # get all used styles
+    for style_id in document.used_styles:
+        all_styles += get_all_styles(document, document.styles.get_by_id(style_id))
 
-        while True:
-            try:
-                based_style = document.styles.get_by_id(based_style.based_on)
-                _css = get_style_css(based_style) + _css
-            except:
-                break
+    # get all default styles
 
-        _css += get_style_css(style)
+    def _generate(style_id, n):
+        style = document.styles.get_by_id(style_id)
+        style_css = get_style_css(style, embed=False)
 
+        return "{} {{ {} }}\n".format(",".join(['{} {}'.format(prefix, x) for x in n]), style_css)
+
+    for style_type, style_id in six.iteritems(document.styles.default_styles):
+        if style_type == 'table':
+            n = ["table"]
+            css_content += _generate(style_id, n)
+        elif style_type == 'paragraph':
+            n = ["p", "div", "span"]
+            css_content += _generate(style_id, n)            
+        elif style_type == 'character':
+            n = ["span"]
+            css_content += _generate(style_id, n)            
+        elif style_type == 'numbering':
+            n = ["ul", "li"]
+            css_content += _generate(style_id, n)
+
+    # DEFAULT STYLES SEPARATELY!
+
+    # get style content for all styles
+    for style_id in set(all_styles):
+        style = document.styles.get_by_id(style_id)
+        css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), get_style_css(style, embed=False))
+
+    return css_content
 
 # Serialize list of elements into HTML
 

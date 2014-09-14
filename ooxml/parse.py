@@ -248,8 +248,24 @@ def parse_paragraph(document, par):
     return paragraph
 
 
+def parse_table_properties(doc, table, prop):
+    if not table:
+        return
+
+    style = prop.find(_name('{{{w}}}tblStyle'))
+
+    if style is not None:
+        table.style_id = style.attrib[_name('{{{w}}}val')]
+        doc.add_style_as_used(table.style_id)
+
+
 def parse_table(document, tbl):
     table = doc.Table()
+
+    tbl_pr = tbl.find(_name('{{{w}}}tblPr'))
+
+    if tbl_pr is not None:
+        parse_table_properties(document, table, tbl_pr)
 
     for tr in tbl.xpath('./w:tr', namespaces=NAMESPACES):
         columns = []
