@@ -263,7 +263,41 @@ def parse_table_properties(doc, table, prop):
         doc.add_style_as_used(table.style_id)
 
 
+def parse_table_column_properties(doc, cell, prop):
+    if not cell:
+        return
+
+    grid = prop.find(_name('{{{w}}}gridSpan'))
+
+    if grid is not None:
+        cell.grid_span = int(grid.attrib[_name('{{{w}}}val')])
+
+
+    vmerge = prop.find(_name('{{{w}}}vMerge'))
+
+    if vmerge is not None:
+        if _name('{{{w}}}val') in vmerge.attrib:
+            cell.vmerge = vmerge.attrib[_name('{{{w}}}val')]
+        else:
+            cell.vmerge = ""
+
+
 def parse_table(document, tbl):
+
+    def _change(rows, pos_x):
+        if len(rows) == 1:
+            return rows
+
+        count_x = 1
+
+        for x in rows[-1]:
+            if count_x == pos_x:
+                x.row_span += 1
+
+            count_x += x.grid_span
+
+        return rows
+
     table = doc.Table()
 
     tbl_pr = tbl.find(_name('{{{w}}}tblPr'))
@@ -273,14 +307,26 @@ def parse_table(document, tbl):
 
     for tr in tbl.xpath('./w:tr', namespaces=NAMESPACES):
         columns = []
+        pos_x = 0
 
-        for tc in tr.xpath('./w:tc', namespaces=NAMESPACES):
-            _p = []
+        for tc in tr.xpath('./w:tc', namespaces=NAMESPACES):            
+            cell = doc.TableCell()
 
-            for p in tc.xpath('./w:p', namespaces=NAMESPACES):
-                _p.append(parse_paragraph(document, p))
+            tc_pr = tc.find(_name('{{{w}}}tcPr'))
 
-            columns.append(_p)
+            if tc_pr is not None:
+                parse_table_column_properties(doc, cell, tc_pr)
+
+            # maybe after
+            pos_x += cell.grid_span
+
+            if cell.vmerge is not None and cell.vmerge == "":
+                table.rows = _change(table.rows, pos_x)
+            else:
+                for p in tc.xpath('./w:p', namespaces=NAMESPACES):
+                    cell.elements.append(parse_paragraph(document, p))
+
+                columns.append(cell)
 
         table.rows.append(columns)
 

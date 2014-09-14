@@ -394,6 +394,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         # - missing list of heading styles somehwhere
         if ctx.header.is_header(style, elem):
             elem.tag = ctx.header.get_header(style, elem)
+
             if root is not None:
                 root.append(elem)
 
@@ -474,10 +475,16 @@ def serialize_table(ctx, document, table, root):
     for rows in table.rows:
         _tr = etree.SubElement(_table, 'tr')
 
-        for columns in rows:
+        for cell in rows:
             _td = etree.SubElement(_tr, 'td')
 
-            for elem in columns:
+            if cell.grid_span != 1:
+                _td.set('colspan', str(cell.grid_span))
+
+            if cell.row_span != 1:
+                _td.set('rowspan', str(cell.row_span))
+
+            for elem in cell.elements:
                 if isinstance(elem, doc.Paragraph):
                     _ser = ctx.get_serializer(elem)
 

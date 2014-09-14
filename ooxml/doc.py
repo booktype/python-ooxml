@@ -143,6 +143,21 @@ class Image(Element):
     def value(self):
         return self.rid
 
+
+class TableCell(Element):
+    def __init__(self):
+        super(TableCell, self).__init__()
+
+        self.grid_span = 1
+        self.row_span = 1
+        self.vmerge = None        
+        self.elements = []
+
+
+    def value(self):
+        return self.elements
+
+
 class Table(Element):
     def __init__(self):
         super(Table, self).__init__()
