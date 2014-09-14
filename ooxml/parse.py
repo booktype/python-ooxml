@@ -235,6 +235,10 @@ def parse_paragraph(document, par):
             _m = doc.Math()
             paragraph.elements.append(_m)
 
+        if elem.tag == _name('{{{m}}}oMathPara'):
+            _m = doc.Math()
+            paragraph.elements.append(_m)
+
         if elem.tag == _name('{{{w}}}hyperlink'):
             try:
                 t = doc.Link(elem.attrib[_name('{{{r}}}id')])
