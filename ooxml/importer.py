@@ -193,7 +193,11 @@ def get_chapters(doc):
                 export_chapters.append(_serialize_chapter(doc.elements[:chapters[0]['index']-1]))
 
         for n in range(len(chapters)-1):
-            _html = _serialize_chapter(doc.elements[chapters[n]['index']:chapters[n+1]['index']-1])
+            if chapters[n]['index'] == chapters[n+1]['index']-1:
+                _html = _serialize_chapter([doc.elements[chapters[n]['index']]])
+            else:
+                _html = _serialize_chapter(doc.elements[chapters[n]['index']:chapters[n+1]['index']-1])
+
             export_chapters.append(_html)
 
         export_chapters.append(_serialize_chapter(doc.elements[chapters[-1]['index']:]))
