@@ -21,7 +21,7 @@ def _name(name):
     return name.format(**NAMESPACES)
 
 
-def parse_previous_properties(doc, paragraph, prop):
+def parse_previous_properties(document, paragraph, prop):
     if not paragraph:
         return
 
@@ -29,7 +29,7 @@ def parse_previous_properties(doc, paragraph, prop):
 
     if style is not None:
         paragraph.rpr['style'] = style.attrib[_name('{{{w}}}val')]
-        doc.add_style_as_used(paragraph.rpr['style'])
+        document.add_style_as_used(paragraph.rpr['style'])
 
     color = prop.find(_name('{{{w}}}color'))
 
@@ -45,7 +45,16 @@ def parse_previous_properties(doc, paragraph, prop):
 
     if sz is not None:
         paragraph.rpr['sz'] = sz.attrib[_name('{{{w}}}val')]
-        doc.add_font_as_used(paragraph.rpr['sz'])
+
+        if isinstance(paragraph, doc.Text):
+            if not ('dropcap' in paragraph.ppr  and paragraph.ppr['dropcap']):
+                if paragraph.parent and (not ('dropcap' in paragraph.parent.ppr  and paragraph.parent.ppr['dropcap'])):
+                    document.add_font_as_used(paragraph.rpr['sz'])            
+        elif isinstance(paragraph, doc.Paragraph):
+            if not ('dropcap' in paragraph.ppr  and paragraph.ppr['dropcap']):
+                document.add_font_as_used(paragraph.rpr['sz'])
+        else:
+            document.add_font_as_used(paragraph.rpr['sz']) 
 
     # parse bold
     b = prop.find(_name('{{{w}}}b'))
@@ -114,15 +123,12 @@ def parse_paragraph_properties(doc, paragraph, prop):
         if numid is not None:
             paragraph.numid = int(numid.attrib[_name('{{{w}}}val')])
 
-    rpr = prop.find(_name('{{{w}}}rPr'))
-
-    if rpr is not None:
-        parse_previous_properties(doc, paragraph, rpr)
-
     jc = prop.find(_name('{{{w}}}jc'))
 
     if jc is not None:
         paragraph.ppr['jc'] = jc.attrib[_name('{{{w}}}val')]
+
+    # w:ind - left leftChars right hanging firstLine
 
     ind = prop.find(_name('{{{w}}}ind'))
 
@@ -132,8 +138,21 @@ def parse_paragraph_properties(doc, paragraph, prop):
         if _name('{{{w}}}left') in ind.attrib:
             paragraph.ppr['ind']['left'] = ind.attrib[_name('{{{w}}}left')]
 
+    frame_pr = prop.find(_name('{{{w}}}framePr'))
 
-    # w:ind - left leftChars right hanging firstLine
+    if frame_pr is not None:
+        if _name('{{{w}}}dropCap') in frame_pr.attrib:
+            drop_cap = frame_pr.attrib[_name('{{{w}}}dropCap')]
+
+            if drop_cap.lower() in ['drop', 'margin']:
+                paragraph.ppr['dropcap'] = True
+
+    rpr = prop.find(_name('{{{w}}}rPr'))
+
+    if rpr is not None:
+        parse_previous_properties(doc, paragraph, rpr)
+
+
 
 def parse_drawing(document, container, elem):
     blip = elem.xpath('.//a:blip', namespaces=NAMESPACES)[0]        
@@ -186,12 +205,14 @@ def parse_text(document, container, element):
 
     if t is not None:
         txt = doc.Text(t.text)
+        txt.parent = container
 
         container.elements.append(txt)
 
     rpr = element.find(_name('{{{w}}}rPr'))
 
     if rpr is not None:
+        # Notice it is using txt as container
         parse_previous_properties(document, txt, rpr)
 
     r = element.find(_name('{{{w}}}r'))
