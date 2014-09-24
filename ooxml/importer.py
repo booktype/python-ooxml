@@ -184,7 +184,7 @@ def get_chapters(doc):
     from . import serialize
 
     def _serialize_chapter(els):
-        s =  serialize.serialize_elements(doc, els)
+        s =  serialize.serialize_elements(doc, els, options={'empty_paragraph_as_nbsp': True})
 
         if s.startswith(six.b('<div/>')):
             return ('', six.b('<body></body>'))
