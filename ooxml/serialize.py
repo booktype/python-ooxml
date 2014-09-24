@@ -221,7 +221,7 @@ def get_style_fontsize(node):
 
     return 0
 
-def get_style_css(node, embed=True):
+def get_style_css(ctx, node, embed=True):
     style = []
 
     if not node:
@@ -255,7 +255,12 @@ def get_style_css(node, embed=True):
 
     if 'sz' in node.rpr:
         size = int(node.rpr['sz']) / 2
-        style.append('font-size: {}pt'.format(size))
+
+        if ctx.options['scale_to_size']:
+            scale = int(round(size / ctx.options['scale_to_size'] * 100.0))
+            style.append('font-size: {}%'.format(scale))
+        else:
+            style.append('font-size: {}pt'.format(size))
 
     if 'ind' in node.ppr:
         if 'left' in node.ppr['ind']:
@@ -302,7 +307,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
     elem = etree.Element('p')
 
-    _style = get_style_css(par)
+    _style = get_style_css(ctx, par)
 
     if _style != '':
         elem.set('style', _style)
@@ -320,7 +325,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
         if isinstance(el, doc.Text):
             children = list(elem)
-            _text_style = get_style_css(el)
+            _text_style = get_style_css(ctx, el)
 
             if get_style_fontsize(el) > max_font_size:
                 max_font_size = get_style_fontsize(el)
@@ -359,9 +364,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             if _text_style != '':
                 new_element.set('style', _text_style)
-            else:
-                # maybe we don't need this
-                new_element.set('class', 'noformat')
+            # else:
+            #     # maybe we don't need this
+            #     new_element.set('class', 'noformat')
 
             was_inserted = False
 
@@ -389,28 +394,29 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 else:
                     elem.append(new_element)
     
-    if style:
-        # todo:
-        # - missing list of heading styles somehwhere
-        if ctx.header.is_header(style, elem):
-            elem.tag = ctx.header.get_header(style, elem)
+    if not par.is_dropcap():
+        if style:
+            # todo:
+            # - missing list of heading styles somehwhere
+            if ctx.header.is_header(style, elem):
+                elem.tag = ctx.header.get_header(style, elem)
 
-            if root is not None:
-                root.append(elem)
+                if root is not None:
+                    root.append(elem)
 
-            fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
-            return root
-    else:
-        if max_font_size > ctx.header.default_font_size:
-            if ctx.header.is_header(max_font_size, elem):
-                if elem.text != '' and len(list(elem)) != 0:
-                    elem.tag = ctx.header.get_header(max_font_size, elem)
+                fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
+                return root
+        else:
+            if max_font_size > ctx.header.default_font_size:
+                if ctx.header.is_header(max_font_size, elem):
+                    if elem.text != '' and len(list(elem)) != 0:
+                        elem.tag = ctx.header.get_header(max_font_size, elem)
 
-                    if root is not None:
-                        root.append(elem)
+                        if root is not None:
+                            root.append(elem)
 
-                    fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
-                    return root
+                        fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
+                        return root
 
     # Indentation is different. We are starting or closing list.
     if par.ilvl != None:        
@@ -538,7 +544,14 @@ class HeaderContext:
 
             return 
 
-        self.header_sizes = [[el] for el in reversed(collections.OrderedDict(sorted(_filter_font_sizes(doc.used_font_size.items()), key=lambda t: t[0])))]
+        most_common_fonts = doc.used_font_size.most_common()
+        most_common = -1
+        if len(most_common_fonts) > 0:
+            if most_common_fonts[0][1] > 4: # this is huge gable, we should calculate it better
+                most_common = most_common_fonts[0][0]
+
+        _list_of_fonts = [fnt for fnt in doc.used_font_size.items() if fnt[0] != most_common] 
+        self.header_sizes = [[el] for el in reversed(collections.OrderedDict(sorted(_filter_font_sizes(_list_of_fonts), key=lambda t: t[0])))]
 
         for style_id in doc.used_styles:
             style = doc.styles.get_by_id(style_id)
@@ -558,6 +571,7 @@ class HeaderContext:
                             break
                     elif self.header_sizes[i][0] == font_size:
                         self.header_sizes[i].append(style_id)
+
 
     def is_header(self, style, node):
         for st in self.header_sizes:
@@ -606,7 +620,8 @@ DEFAULT_OPTIONS = {
     },
 
     'hooks': {},
-    'header': HeaderContext
+    'header': HeaderContext,
+    'scale_to_size': None
 }
 
 
@@ -623,6 +638,9 @@ class Context:
 
             if 'header' in options:
                 self.options['header'] = options['header']
+
+            if 'scale_to_size' in options:
+                self.options['scale_to_size'] = options['scale_to_size']
 
         self.reset()
         self.header.init(document)
@@ -660,32 +678,34 @@ def serialize_styles(document, prefix=''):
 
     # get all default styles
 
-    def _generate(style_id, n):
+    def _generate(ctx, style_id, n):
         style = document.styles.get_by_id(style_id)
-        style_css = get_style_css(style, embed=False)
+        style_css = get_style_css(ctx, style, embed=False)
 
         return "{} {{ {} }}\n".format(",".join(['{} {}'.format(prefix, x) for x in n]), style_css)
+
+    ctx = Context(document)
 
     for style_type, style_id in six.iteritems(document.styles.default_styles):
         if style_type == 'table':
             n = ["table"]
-            css_content += _generate(style_id, n)
+            css_content += _generate(ctx, style_id, n)
         elif style_type == 'paragraph':
             n = ["p", "div", "span"]
-            css_content += _generate(style_id, n)            
+            css_content += _generate(ctx, style_id, n)            
         elif style_type == 'character':
             n = ["span"]
-            css_content += _generate(style_id, n)            
+            css_content += _generate(ctx, style_id, n)            
         elif style_type == 'numbering':
             n = ["ul", "li"]
-            css_content += _generate(style_id, n)
+            css_content += _generate(ctx, style_id, n)
 
     # DEFAULT STYLES SEPARATELY!
 
     # get style content for all styles
     for style_id in set(all_styles):
         style = document.styles.get_by_id(style_id)
-        css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), get_style_css(style, embed=False))
+        css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), get_style_css(ctx, style, embed=False))
 
     return css_content
 

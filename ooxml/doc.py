@@ -6,6 +6,8 @@
 
 """
 
+import collections
+
 class Style(object):
     def __init__(self):
         self.reset()
@@ -58,7 +60,7 @@ class Document(object):
 
     def add_font_as_used(self, sz):
         fsz = int(sz) / 2
-        self.used_font_size[fsz] = self.used_font_size.setdefault(fsz, 0) + 1
+        self.used_font_size[fsz] += 1
 
     def get_styles(self, name):
         styles = []
@@ -80,7 +82,7 @@ class Document(object):
         self.styles = StylesCollection()
         self.default_style = None
         self.used_styles = []
-        self.used_font_size = {}
+        self.used_font_size = collections.Counter()
 
 
 class Element(object):
@@ -97,6 +99,7 @@ class Paragraph(Element):
 
         self.reset()
 
+
     def reset(self):
         self.elements = []
 
@@ -107,14 +110,18 @@ class Paragraph(Element):
         self.rpr = {}
         self.ppr = {}
 
+    def is_dropcap(self):
+        return 'dropcap' in self.ppr and self.ppr['dropcap']
+
 
 class Text(Element):
-    def __init__(self, text = ''):
+    def __init__(self, text='', parent=None):
         super(Text, self).__init__()
 
         self.text = text
         self.rpr = {}
         self.ppr = {}
+        self.parent = None
 
 
     def value(self):
