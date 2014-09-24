@@ -418,6 +418,10 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                         fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
                         return root
 
+    if len(list(elem)) == 0 and elem.text is None:
+        if ctx.options['empty_paragraph_as_nbsp']:
+            elem.append(etree.Entity('nbsp'))
+
     # Indentation is different. We are starting or closing list.
     if par.ilvl != None:        
         root = open_list(ctx, document, par, root, elem)
@@ -621,7 +625,8 @@ DEFAULT_OPTIONS = {
 
     'hooks': {},
     'header': HeaderContext,
-    'scale_to_size': None
+    'scale_to_size': None,
+    'empty_paragraph_as_nbsp': False
 }
 
 
@@ -636,11 +641,16 @@ class Context:
             if 'hooks' in options:
                 self.options['hooks'].update(options['hooks'])
 
+            # this is not that good way of updating options
+
             if 'header' in options:
                 self.options['header'] = options['header']
 
             if 'scale_to_size' in options:
                 self.options['scale_to_size'] = options['scale_to_size']
+
+            if 'empty_paragraph_as_nbsp' in options:
+                self.options['empty_paragraph_as_nbsp'] = options['empty_paragraph_as_nbsp']
 
         self.reset()
         self.header.init(document)
