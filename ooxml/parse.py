@@ -197,7 +197,6 @@ def parse_text(document, container, element):
     if br is not None:
         if _name('{{{w}}}type') in br.attrib:
             _type = br.attrib[_name('{{{w}}}type')]        
-
             brk = doc.Break(_type)
             container.elements.append(brk)
 
@@ -367,6 +366,9 @@ def parse_document(xmlcontent):
 
         if elem.tag == _name('{{{w}}}tbl'):
             document.elements.append(parse_table(document, elem))
+
+        if elem.tag == _name('{{{w}}}sdt'):
+            document.elements.append(doc.TOC())
 
     return document
 

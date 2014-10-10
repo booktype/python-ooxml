@@ -115,9 +115,9 @@ def serialize_image(ctx, document, elem, root):
 
 
 def close_list(ctx, root):
+
     try:
         n = len(ctx.in_list)
-
         if n <= 0:
             return root
 
@@ -257,7 +257,7 @@ def get_style_css(ctx, node, embed=True):
         size = int(node.rpr['sz']) / 2
 
         if ctx.options['scale_to_size']:
-            scale = int(round(size / ctx.options['scale_to_size'] * 100.0))
+            scale = int(round(size) / ctx.options['scale_to_size'] * 100.0)
             style.append('font-size: {}%'.format(scale))
         else:
             style.append('font-size: {}pt'.format(size))
@@ -316,6 +316,10 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         elem.set('class', get_css_classes(document, style))
 
     max_font_size = get_style_fontsize(par)
+
+    if style:
+        max_font_size = style.get_font_size()
+
         
     for el in par.elements:
         _serializer =  ctx.get_serializer(el)
@@ -398,8 +402,11 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         if style:
             # todo:
             # - missing list of heading styles somehwhere
-            if ctx.header.is_header(style, elem):
-                elem.tag = ctx.header.get_header(style, elem)
+            if ctx.header.is_header(par, max_font_size, elem):
+                elem.tag = ctx.header.get_header(par, style, elem)
+                if par.ilvl == None:        
+                    root = close_list(ctx, root)
+                    ctx.ilvl, ctx.numid = None, None
 
                 if root is not None:
                     root.append(elem)
@@ -407,10 +414,16 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
                 return root
         else:
-            if max_font_size > ctx.header.default_font_size:
-                if ctx.header.is_header(max_font_size, elem):
+#            if max_font_size > ctx.header.default_font_size:
+            if True:
+                if ctx.header.is_header(par, max_font_size, elem):
                     if elem.text != '' and len(list(elem)) != 0:
-                        elem.tag = ctx.header.get_header(max_font_size, elem)
+                        elem.tag = ctx.header.get_header(par, max_font_size, elem)
+
+                        if par.ilvl == None:        
+                            root = close_list(ctx, root)
+                            ctx.ilvl, ctx.numid = None, None
+
 
                         if root is not None:
                             root.append(elem)
@@ -473,6 +486,10 @@ def serialize_footnote(ctx, document, el, root):
 
 
 def serialize_table(ctx, document, table, root):
+    if ctx.ilvl != None:
+        root = close_list(ctx, root)
+        ctx.ilvl, ctx.numid = None, None
+
     _table = etree.SubElement(root, 'table')
     _table.set('border', '1')
     _table.set('width', '100%')
@@ -497,14 +514,15 @@ def serialize_table(ctx, document, table, root):
             for elem in cell.elements:
                 if isinstance(elem, doc.Paragraph):
                     _ser = ctx.get_serializer(elem)
-
                     _td = _ser(ctx, document, elem, _td, embed=False)
 
-            root = close_list(ctx, root)
-            ctx.ilvl, ctx.numid = None, None
+            if ctx.ilvl != None:
+#                root = close_list(ctx, root)
+                _td = close_list(ctx, _td)
+
+                ctx.ilvl, ctx.numid = None, None
 
             fire_hooks(ctx, document, table, _td, ctx.get_hook('td'))
-
         fire_hooks(ctx, document, table, _td, ctx.get_hook('tr'))
 
     fire_hooks(ctx, document, table, _table, ctx.get_hook('table'))
@@ -577,34 +595,66 @@ class HeaderContext:
                         self.header_sizes[i].append(style_id)
 
 
-    def is_header(self, style, node):
-        for st in self.header_sizes:
-            if style:
-                if hasattr(style, 'style_id'):
-                    if style.style_id in st:
-                        return True
-                else:
-                    if style in st:
-                        return True
+    def is_header(self, elem, style, node):
+        if hasattr(elem, 'possible_header'):
+            if elem.possible_header:
+                return True
 
-        return False        
+        if not style:
+            return False
 
 
-    def get_header(self, style, node):
-        for idx, st in enumerate(self.header_sizes):
-            if style:
-                if hasattr(style, 'style_id'):
-                    if style.style_id in st:
-                        n = idx + 1
-                        if n > 6:
-                            n = 6
-                        return 'h{}'.format(n)
-                else:
-                    if style in st:
-                        n = idx + 1
-                        if n > 6:
-                            n = 6
-                        return 'h{}'.format(n)
+        if hasattr(style, 'style_id'):
+            return style.get_font_size() in self.doc.possible_headers
+        else:
+            return style in self.doc.possible_headers
+        # for st in self.header_sizes:
+        #     if style:
+        #         if hasattr(style, 'style_id'):
+        #             if style.style_id in st:
+        #                 return True
+        #         else:
+        #             if style in st:
+        #                 return True
+
+        # return False        
+
+
+    def get_header(self, elem, style, node):
+
+        font_size = style
+
+        if hasattr(elem, 'possible_header'):
+            if elem.possible_header:
+                return 'h1'
+
+        if not style:
+            return 'h6'
+
+        if hasattr(style, 'style_id'):
+            font_size = style.get_font_size() 
+
+        try:
+            return 'h{}'.format(self.doc.possible_headers.index(font_size)+1)
+        except ValueError:
+            return 'h6'
+
+        # for idx, st in enumerate(self.header_sizes):
+        #     if style:
+        #         if hasattr(style, 'style_id'):
+        #             if style.style_id in st:
+        #                 n = idx + 1
+        #                 if n > 6:
+        #                     n = 6
+        #                 return 'h{}'.format(n)
+        #         else:
+        #             if style in st:
+        #                 n = idx + 1
+        #                 if n > 6:
+        #                     n = 6
+        #                 return 'h{}'.format(n)
+
+        # return 'h2'
 
 
 
@@ -678,7 +728,7 @@ class Context:
 
 # Serialize style into CSS
 
-def serialize_styles(document, prefix=''):
+def serialize_styles(document, prefix='', options=None):
     all_styles = []
     css_content = ''
 
@@ -694,7 +744,7 @@ def serialize_styles(document, prefix=''):
 
         return "{} {{ {} }}\n".format(",".join(['{} {}'.format(prefix, x) for x in n]), style_css)
 
-    ctx = Context(document)
+    ctx = Context(document, options=options)
 
     for style_type, style_id in six.iteritems(document.styles.default_styles):
         if style_type == 'table':

@@ -6,6 +6,7 @@
 
 """
 
+import six
 import collections
 
 class Style(object):
@@ -16,11 +17,17 @@ class Style(object):
         self.style_id = ''
         self.style_type = ''
         self.is_default = False
-        self.named = ''
+        self.name = ''
         self.based_on = ''
 
         self.rpr = {}
         self.ppr = {}
+
+    def get_font_size(self):
+        if 'sz' in self.rpr:
+            return int(self.rpr['sz'])/2
+
+        return -1
 
 
 class StylesCollection:
@@ -28,9 +35,13 @@ class StylesCollection:
         self.reset()
 
     def get_by_name(self, name, style_type = None):
-        st = self.styles.get(style_id, None)
+        for st in self.styles.values():
+            if st:
+                if st.name == name:
+                    return st
+
         if style_type and not st:
-            st = self.styles.get(self.default_style[style_type], None)
+            st = self.styles.get(self.default_styles[style_type], None)            
         return st
 
     def get_by_id(self, style_id, style_type = None):
@@ -40,7 +51,7 @@ class StylesCollection:
                     return st
 
         if style_type:
-            return self.styles.get(self.default_style[style_type], None)
+            return self.styles.get(self.default_styles[style_type], None)
         return None
     
     def reset(self):
@@ -64,9 +75,8 @@ class Document(object):
 
     def get_styles(self, name):
         styles = []
-
-        while True:                    
-            style = self.get_style_by_name(name)
+        while True:                     
+            style = self.styles.get_by_id(name)
 
             styles.append(style)
 
@@ -74,6 +84,30 @@ class Document(object):
                 return styles
 
             name = style.based_on
+
+    def _calculate_possible_headers(self):
+        _headers = []
+        _text = []
+        max_count = sum(six.itervalues(self.usage_font_size))
+
+        for name in self.used_styles:
+            _style = self.styles.get_by_id(name)
+            _headers.append(_style.get_font_size())
+
+        for font_size, amount in six.iteritems(self.usage_font_size):
+            if float(amount) / max_count <= 0.1:
+                _headers.append(font_size)
+            else:
+                _text.append(font_size)
+
+        self.possible_headers = [x for x in reversed(sorted(_headers))]
+        self.possible_text = [x for x in reversed(sorted(_text))]
+
+        # remove all possible headers which are bigger than biggest normal font size
+        if len(self.possible_text) > 0:
+            for value in self.possible_headers[:]:
+                if self.possible_text[0] > value:
+                    self.possible_headers.remove(value)
 
     def reset(self):
         self.elements = []
@@ -84,13 +118,17 @@ class Document(object):
         self.used_styles = []
         self.used_font_size = collections.Counter()
 
+        self.usage_font_size = collections.Counter()
+        self.possible_headers = []
+        self.possible_text = []
+
 
 class Element(object):
     def reset(self):
         pass
 
     def value(self):
-        pass
+        return None
 
  
 class Paragraph(Element):
@@ -109,6 +147,8 @@ class Paragraph(Element):
 
         self.rpr = {}
         self.ppr = {}
+
+        self.possible_header = False
 
     def is_dropcap(self):
         return 'dropcap' in self.ppr and self.ppr['dropcap']
@@ -291,6 +331,9 @@ class Symbol(Element):
 
     def value(self):
         return self.SYMBOLS.get(self.character, self.character)
+
+class TOC(Element):
+    pass
 
 
 class Break(Element):
