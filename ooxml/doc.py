@@ -9,7 +9,14 @@
 import six
 import collections
 
+
 class Style(object):
+    """Style object represent OOXML defined style.
+
+    Style is defined by unique identifier. Besides unique identifier style also has defined
+    descriptive name. Styles can also be based on another style.
+    """
+
     def __init__(self):
         self.reset()
 
@@ -24,6 +31,13 @@ class Style(object):
         self.ppr = {}
 
     def get_font_size(self):
+        """Returns font size for this style. 
+
+        Does not check definition in the parent styles.
+
+        :Returns:
+          Returns font size as integer. Returns -1 if font size is not defined for this style.
+        """
         if 'sz' in self.rpr:
             return int(self.rpr['sz'])/2
 
@@ -31,10 +45,19 @@ class Style(object):
 
 
 class StylesCollection:
+    """Collection of defined styles.
+
+    """
+
     def __init__(self):
         self.reset()
 
     def get_by_name(self, name, style_type = None):
+        """Find style by it's descriptive name.
+
+        :Returns:
+          Returns found style of type :class:`ooxml.doc.Style`.
+        """
         for st in self.styles.values():
             if st:
                 if st.name == name:
@@ -45,6 +68,12 @@ class StylesCollection:
         return st
 
     def get_by_id(self, style_id, style_type = None):
+        """Find style by it's unique identifier
+
+        :Returns:
+          Returns found style of type :class:`ooxml.doc.Style`.
+        """
+
         for st in self.styles.values():
             if st:
                 if st.style_id == style_id:
@@ -60,6 +89,8 @@ class StylesCollection:
 
 
 class Document(object):
+    "Represents OOXML document."
+
     def __init__(self):
         super(Document, self).__init__()
 
@@ -90,13 +121,21 @@ class Document(object):
         _text = []
         max_count = sum(six.itervalues(self.usage_font_size))
 
+        from .serialize import _get_font_size
+
         for name in self.used_styles:
             _style = self.styles.get_by_id(name)
-            _headers.append(_style.get_font_size())
+            font_size = _get_font_size(self, _style)
+
+            if font_size != -1 and font_size not in _headers:
+                _headers.append(font_size)
+
+        self.possible_headers_style = [x for x in reversed(sorted(_headers))]
 
         for font_size, amount in six.iteritems(self.usage_font_size):
-            if float(amount) / max_count <= 0.1:
-                _headers.append(font_size)
+            if float(amount) / max_count <= 0.1:                
+                if font_size not in _headers:
+                    _headers.append(font_size)
             else:
                 _text.append(font_size)
 
@@ -106,24 +145,31 @@ class Document(object):
         # remove all possible headers which are bigger than biggest normal font size
         if len(self.possible_text) > 0:
             for value in self.possible_headers[:]:
-                if self.possible_text[0] > value:
+                if self.possible_text[0] >= value:
                     self.possible_headers.remove(value)
+#                    self.possible_headers_style.remove(value)
+
 
     def reset(self):
         self.elements = []
         self.relationships = {}
         self.footnotes = {}
+        self.numbering = {}
+        self.abstruct_numbering = {}
         self.styles = StylesCollection()
         self.default_style = None
         self.used_styles = []
         self.used_font_size = collections.Counter()
 
         self.usage_font_size = collections.Counter()
+        self.possible_headers_style = []
         self.possible_headers = []
         self.possible_text = []
 
 
 class Element(object):
+    "Basic element paresed in the OOXML document."
+
     def reset(self):
         pass
 
@@ -132,6 +178,11 @@ class Element(object):
 
  
 class Paragraph(Element):
+    """Represents basic paragraph element in OOXML document.
+
+    Paragraph can also hold other elements. Besides that, list items and dropcaps are also defined by
+    this element.
+    """
     def __init__(self):
         super(Paragraph, self).__init__()
 
@@ -155,6 +206,8 @@ class Paragraph(Element):
 
 
 class Text(Element):
+    "Represents Text element which can be found inside of other Paragraph elements."
+
     def __init__(self, text='', parent=None):
         super(Text, self).__init__()
 
@@ -167,7 +220,10 @@ class Text(Element):
     def value(self):
         return self.text
 
+
 class Link(Element):
+    "Represents link element holding reference to internal or external link."
+
     def __init__(self, rid):
         super(Link, self).__init__()
 
@@ -181,7 +237,10 @@ class Link(Element):
         return self.elements
 #        return ''.join(elem.value() for elem in self.elements)
 
+
 class Image(Element):
+    "Represent image element."
+
     def __init__(self, rid):
         super(Image, self).__init__()
 
@@ -192,6 +251,8 @@ class Image(Element):
 
 
 class TableCell(Element):
+    "Represent one cell in a table."
+
     def __init__(self):
         super(TableCell, self).__init__()
 
@@ -206,6 +267,8 @@ class TableCell(Element):
 
 
 class Table(Element):
+    "Represents table element."
+
     def __init__(self):
         super(Table, self).__init__()
 
@@ -216,6 +279,8 @@ class Table(Element):
 
 
 class Footnote(Element):
+    "Represents footnote element."
+
     def __init__(self, rid):
         super(Footnote, self).__init__()
 
@@ -224,7 +289,10 @@ class Footnote(Element):
     def value(self):
         return self.rid
 
+
 class TextBox(Element):
+    "Represents TextBox element."
+
     def __init__(self, elements):
         super(TextBox, self).__init__()
 
@@ -235,6 +303,11 @@ class TextBox(Element):
 
 
 class Symbol(Element):
+    """Represents special symbol element.
+
+    For some symbols it can do transformation into unicode element.
+    """
+
     SYMBOLS = {
         'F020': u'\u0020',
         'F021': u'\u270F',        
@@ -332,12 +405,21 @@ class Symbol(Element):
     def value(self):
         return self.SYMBOLS.get(self.character, self.character)
 
+
 class TOC(Element):
+    """Represents Table Of Contents element.
+
+    We don't do much with this element at the moment."""    
     pass
 
 
 class Break(Element):
-    def __init__(self, break_type):
+    """Represents break element.
+
+    At the moment we support Line Break (textWrapping) and Page Break (page).
+    """
+
+    def __init__(self, break_type='textWrapping'):
         self.break_type = break_type
 
     def value(self):
@@ -345,6 +427,10 @@ class Break(Element):
 
 
 class Math(Element):
+    """Represents Math element.
+
+    Math elements are not supported at the moment. We just parse them and create empty element."""
+
     def __init__(self):
         pass
 

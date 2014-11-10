@@ -36,6 +36,33 @@ from lxml import etree
 from . import doc
 
 
+###############################################################################
+## TEMP FUNCTIONS
+###############################################################################
+
+def _get_font_size(document, style):
+    """Get font size defined for this style.
+
+    It will try to get font size from it's parent style if it is not defined by original style. 
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - style (:class:`ooxml.doc.Style`): Style object
+
+    :Returns:
+      Returns font size as a number. -1 if it can not get font size.
+    """
+
+    font_size = style.get_font_size()
+
+    if  font_size == -1:
+        if style.based_on:
+            based_on = document.styles.get_by_id(style.based_on)
+            if based_on:
+                return _get_font_size(document, based_on)
+
+    return font_size
+
 def _get_based_on(styles, name):
     for _, values in styles.items():
         if values.based_on == name:
@@ -44,13 +71,29 @@ def _get_based_on(styles, name):
 
 
 def _get_numbering(document, numid, ilvl):
+    """Returns type for the list.
+
+    :Returns:
+      Returns type for the list. Returns "bullet" by default or in case of an error.
+    """
+
     try:
-        return document.numbering[numid][ilvl]['numFmt']
+        abs_num = document.numbering[numid]
+        return document.abstruct_numbering[abs_num][ilvl]['numFmt']
     except:
         return 'bullet'
 
 
 def _get_numbering_tag(fmt):
+    """Returns HTML tag defined for this kind of numbering.
+
+    :Args:
+      - fmt (str): Type of numbering
+
+    :Returns:
+      Returns "ol" for numbered lists and "ul" for everything else.      
+    """
+
     if fmt == 'decimal':
         return 'ol'
 
@@ -58,6 +101,15 @@ def _get_numbering_tag(fmt):
 
 
 def _get_parent(root):
+    """Returns root element for a list.
+
+    :Args:
+      root (Element): lxml element of current location
+
+    :Returns:
+      lxml element representing list      
+    """
+
     elem = root
 
     while True:
@@ -67,54 +119,18 @@ def _get_parent(root):
             return elem
 
 
-# Serialize elements
-
-def serialize_break(ctx, document, elem, root):
-    _div = etree.SubElement(root, 'span')
-    _div.set('style', 'page-break-after: always;')
-
-    fire_hooks(ctx, document, elem, _div, ctx.get_hook('page_break'))
-
-    return root
-
-
-def serialize_math(ctx, document, elem, root):
-    _div = etree.SubElement(root, 'span')
-    _div.set('style', 'border: 1px solid red')
-    _div.text = 'We do not support Math blocks at the moment.'
-
-    fire_hooks(ctx, document, elem, _div, ctx.get_hook('math'))
-
-    return root
-
-def serialize_link(ctx, document, elem, root):
-    _a = etree.SubElement(root, 'a')
-
-    # this should not take just first element
-    if len(elem.elements) > 0:
-        _a.text = elem.elements[0].value()
-    _a.set('href', document.relationships[elem.rid]['target'])
-
-    fire_hooks(ctx, document, elem, _a, ctx.get_hook('a'))
-
-    return root
-
-
-def serialize_image(ctx, document, elem, root):            
-    img_src = document.relationships[elem.rid]['target']
-
-    img_name, img_extension = os.path.splitext(img_src)
-
-    _img = etree.SubElement(root, 'img')
-    # make path configurable
-    _img.set('src', 'static/{}{}'.format(elem.rid, img_extension))
-
-    fire_hooks(ctx, document, elem, _img, ctx.get_hook('img'))
-
-    return root
-
-
 def close_list(ctx, root):
+    """Close already opened list if needed.
+
+    This will try to see if it is needed to close already opened list.
+
+    :Args:
+      - ctx (:class:`Context`): Context object 
+      - root (Element): lxml element representing current position.
+
+    :Returns:
+      lxml element where future content should be placed.
+    """
 
     try:
         n = len(ctx.in_list)
@@ -141,6 +157,19 @@ def close_list(ctx, root):
 
 
 def open_list(ctx, document, par, root, elem):
+    """Open list if it is needed and place current element as first member of a list.
+
+    :Args:
+      - ctx (:class:`Context`): Context object
+      - document (:class:`ooxml.doc.Document`): Document object
+      - par (:class:`ooxml.doc.Paragraph`): Paragraph element
+      - root (Element): lxml element of current location
+      - elem (Element): lxml element representing current element we are trying to insert
+
+    :Returns:
+        lxml element where future content should be placed.
+    """
+
     _ls = None
 
     if par.ilvl != ctx.ilvl or par.numid != ctx.numid:
@@ -199,9 +228,92 @@ def open_list(ctx, document, par, root, elem):
     fire_hooks(ctx, document, par, _a, ctx.get_hook('li'))
 
     return root
-    
+
+
+###############################################################################
+## SERIALIZER HOOKS
+###############################################################################
+
+def serialize_break(ctx, document, elem, root):
+    "Serialize break element."
+
+    if elem.break_type == u'textWrapping':
+        _div = etree.SubElement(root, 'br')
+    else:
+        _div = etree.SubElement(root, 'span')
+        if ctx.options['embed_styles']:
+            _div.set('style', 'page-break-after: always;')
+
+    fire_hooks(ctx, document, elem, _div, ctx.get_hook('page_break'))
+
+    return root
+
+
+def serialize_math(ctx, document, elem, root):
+    """Serialize math element.
+
+    Math objects are not supported at the moment. This is wht we only show error message.
+    """
+
+    _div = etree.SubElement(root, 'span')
+    if ctx.options['embed_styles']:
+        _div.set('style', 'border: 1px solid red')
+    _div.text = 'We do not support Math blocks at the moment.'
+
+    fire_hooks(ctx, document, elem, _div, ctx.get_hook('math'))
+
+    return root
+
+def serialize_link(ctx, document, elem, root):
+    """Serilaze link element.
+
+    This works only for external links at the moment.
+    """
+
+    _a = etree.SubElement(root, 'a')
+
+    # this should not take just first element
+    if len(elem.elements) > 0:
+        _a.text = elem.elements[0].value()
+    _a.set('href', document.relationships[elem.rid]['target'])
+
+    fire_hooks(ctx, document, elem, _a, ctx.get_hook('a'))
+
+    return root
+
+
+def serialize_image(ctx, document, elem, root):
+    """Serialize image element.
+
+    This is not abstract enough.
+    """
+
+    img_src = document.relationships[elem.rid]['target']
+
+    img_name, img_extension = os.path.splitext(img_src)
+
+    _img = etree.SubElement(root, 'img')
+    # make path configurable
+    _img.set('src', 'static/{}{}'.format(elem.rid, img_extension))
+
+    fire_hooks(ctx, document, elem, _img, ctx.get_hook('img'))
+
+    return root
+
 
 def fire_hooks(ctx, document, elem, element, hooks):
+    """Fire hooks on newly created element.
+
+    For each newly created element we will try to find defined hooks and execute them.
+
+    :Args:
+      - ctx (:class:`Context`): Context object
+      - document (:class:`ooxml.doc.Document`): Document object
+      - elem (:class:`ooxml.doc.Element`): Element which we serialized
+      - element (Element): lxml element which we created
+      - hooks (list): List of hooks
+    """
+
     if not hooks:
         return
 
@@ -209,19 +321,54 @@ def fire_hooks(ctx, document, elem, element, hooks):
         hook(ctx, document, elem, element)
 
 
-def has_style(node):
-    elements = ['b', 'i', 'u', 'strike', 'color', 'jc', 'sz', 'ind', 'superscript', 'subscript']
+def has_style(node):    
+    """Tells us if node element has defined styling.
+
+    :Args:
+      - node (:class:`ooxml.doc.Element`): Element
+
+    :Returns:
+      True or False
+
+    """
+
+    elements = ['b', 'i', 'u', 'strike', 'color', 'jc', 'sz', 'ind', 'superscript', 'subscript', 'small_caps']
 
     return any([True for elem in elements if elem in node.rpr])
 
 
 def get_style_fontsize(node):
+    """Returns font size defined by this element.
+
+    :Args:
+      - node (:class:`ooxml.doc.Element`): Node element
+
+    :Returns:
+      Font size as int number or 0 if it is not defined
+
+    """
     if 'sz' in node.rpr:
         return int(node.rpr['sz']) / 2
 
     return 0
 
+
 def get_style_css(ctx, node, embed=True):
+    """Returns as string defined CSS for this node.
+
+    Defined CSS can be different if it is embeded or no. When it is embeded styling 
+    for bold,italic and underline will not be defined with CSS. In that case we
+    use defined tags <b>,<i>,<u> from the content.
+
+    :Args:
+      - ctx (:class:`Context`): Context object
+      - node (:class:`ooxml.doc.Element`): Node element
+      - embed (book): True by default.
+
+    :Returns:
+      Returns as string defined CSS for this node
+    """
+
     style = []
 
     if not node:
@@ -237,6 +384,9 @@ def get_style_css(ctx, node, embed=True):
 
         if 'u' in node.rpr:
             style.append('text-decoration: underline')
+
+    if 'small_caps' in node.rpr:
+        style.append('font-variant: small-caps')
 
     if 'strike' in node.rpr:
         style.append('text-decoration: line-through')
@@ -267,6 +417,15 @@ def get_style_css(ctx, node, embed=True):
             size = int(node.ppr['ind']['left']) / 10
             style.append('margin-left: {}px'.format(size))
 
+        if 'right' in node.ppr['ind']:
+            size = int(node.ppr['ind']['right']) / 10
+            style.append('margin-right: {}px'.format(size))
+
+        if 'first_line' in node.ppr['ind']:
+            size = int(node.ppr['ind']['first_line']) / 10
+            style.append('text-indent: {}px'.format(size))
+
+
     if len(style) == 0:
         return ''
 
@@ -274,6 +433,16 @@ def get_style_css(ctx, node, embed=True):
 
 
 def get_style(document, elem):
+    """Get the style for this node element.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - elem (:class:`ooxml.doc.Element`): Node element
+
+    :Returns:
+      Returns :class:`ooxml.doc.Style` object or None if it is not found.
+    """
+
     try:
         return document.styles.get_by_id(elem.style_id)
     except AttributeError:
@@ -281,10 +450,23 @@ def get_style(document, elem):
 
 
 def get_style_name(style):
+    """Returns style if for specific style.
+    """
+
     return style.style_id
 
 
 def get_all_styles(document, style):
+    """Returns list of styles on which specified style is based on.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - style (:class:`ooxml.doc.Style`): Style object
+
+    :Returns:
+      List of style objects.
+    """
+
     classes = []
 
     while True:
@@ -299,18 +481,41 @@ def get_all_styles(document, style):
 
 
 def get_css_classes(document, style):
-    return ' '.join([st.lower() for st in get_all_styles(document, style)])
+    """Returns CSS classes for this style.
+
+    This function will check all the styles specified style is based on and return their CSS classes.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - style (:class:`ooxml.doc.Style`): Style object
+
+    :Returns:
+      String representing all the CSS classes for this element.
+
+    >>> get_css_classes(doc, st)
+    'header1 normal'
+    """
+    return ' '.join([st.lower() for st in get_all_styles(document, style)[-1:]])
 
 
 def serialize_paragraph(ctx, document, par, root, embed=True):
+    """Serializes paragraph element.
+
+    This is the most important serializer of them all.    
+    """
+
     style = get_style(document, par)
 
     elem = etree.Element('p')
 
-    _style = get_style_css(ctx, par)
+    if ctx.options['embed_styles']:
+        _style = get_style_css(ctx, par)
 
-    if _style != '':
-        elem.set('style', _style)
+        if _style != '':
+            elem.set('style', _style)
+
+    else:
+        _style = ''
 
     if style:
         elem.set('class', get_css_classes(document, style))
@@ -318,7 +523,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
     max_font_size = get_style_fontsize(par)
 
     if style:
-        max_font_size = style.get_font_size()
+        max_font_size = _get_font_size(document, style)
 
         
     for el in par.elements:
@@ -366,10 +571,12 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 new_element = etree.Element('span')
                 new_element.text = el.value()
 
-            if _text_style != '':
-                new_element.set('style', _text_style)
-            # else:
-            #     # maybe we don't need this
+            if ctx.options['embed_styles']:
+                if _text_style != '':
+                    new_element.set('style', _text_style)
+            # This is for situations when style has options and
+            # text is trying to unset them
+            # else:            
             #     new_element.set('class', 'noformat')
 
             was_inserted = False
@@ -398,11 +605,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 else:
                     elem.append(new_element)
     
-    if not par.is_dropcap():
+    if not par.is_dropcap() and par.ilvl == None:
         if style:
-            # todo:
-            # - missing list of heading styles somehwhere
-            if ctx.header.is_header(par, max_font_size, elem):
+            if ctx.header.is_header(par, max_font_size, elem, style=style):
                 elem.tag = ctx.header.get_header(par, style, elem)
                 if par.ilvl == None:        
                     root = close_list(ctx, root)
@@ -414,9 +619,12 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 fire_hooks(ctx, document, par, elem, ctx.get_hook('h'))
                 return root
         else:
+#            Commented part where we only checked for heading if font size
+#            was bigger than default font size. In many cases this did not
+#            work out well.
 #            if max_font_size > ctx.header.default_font_size:
             if True:
-                if ctx.header.is_header(par, max_font_size, elem):
+                if ctx.header.is_header(par, max_font_size, elem, style=style):
                     if elem.text != '' and len(list(elem)) != 0:
                         elem.tag = ctx.header.get_header(par, max_font_size, elem)
 
@@ -453,6 +661,8 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
 
 def serialize_symbol(ctx, document, el, root):
+    "Serialize special symbols."
+
     span = etree.SubElement(root, 'span')
     span.text = el.value()
 
@@ -462,6 +672,8 @@ def serialize_symbol(ctx, document, el, root):
 
 
 def serialize_footnote(ctx, document, el, root):
+    "Serializes footnotes."
+
     p_foot = document.footnotes[el.rid]
 
     p = etree.Element('p')
@@ -486,6 +698,9 @@ def serialize_footnote(ctx, document, el, root):
 
 
 def serialize_table(ctx, document, table, root):
+    """Serializes table element.
+    """
+
     if ctx.ilvl != None:
         root = close_list(ctx, root)
         ctx.ilvl, ctx.numid = None, None
@@ -531,6 +746,8 @@ def serialize_table(ctx, document, table, root):
 
 
 def serialize_textbox(ctx, document, txtbox, root):
+    """Serialize textbox element."""
+
     _div = etree.SubElement(root, 'div')
     _div.set('class', 'textbox')
 
@@ -544,9 +761,15 @@ def serialize_textbox(ctx, document, txtbox, root):
 
     return root
 
+
 # Header Context
 
 class HeaderContext:
+    """Header context used for header recognition.
+
+    This is used only for easier recognition of headers used during the import process.
+    """
+
     def __init__(self):
         self.doc = None
 
@@ -595,35 +818,64 @@ class HeaderContext:
                         self.header_sizes[i].append(style_id)
 
 
-    def is_header(self, elem, style, node):
-        if hasattr(elem, 'possible_header'):
-            if elem.possible_header:
-                return True
+    def is_header(self, elem, font_size, node, style=None):
+        """Used for checking if specific element is a header or not.
 
-        if not style:
-            return False
+        :Returns:
+          True or False
+        """
+        
+        # This logic has been disabled for now. Mark this as header if it has
+        # been marked during the parsing or mark.
+        # if hasattr(elem, 'possible_header'):
+        #     if elem.possible_header:                
+        #         return True
 
+        # if not style:
+        #     return False
 
         if hasattr(style, 'style_id'):
-            return style.get_font_size() in self.doc.possible_headers
-        else:
-            return style in self.doc.possible_headers
-        # for st in self.header_sizes:
-        #     if style:
-        #         if hasattr(style, 'style_id'):
-        #             if style.style_id in st:
-        #                 return True
-        #         else:
-        #             if style in st:
-        #                 return True
+            fnt_size = _get_font_size(self.doc, style)
 
-        # return False        
+            from .importer import calculate_weight
+            weight = calculate_weight(self.doc, elem)
+            
+            if weight > 50:
+                return False
+
+            if fnt_size in self.doc.possible_headers_style:                
+                return True
+
+            return font_size in self.doc.possible_headers
+        else:
+            list_of_sizes = {}
+            for el in elem.elements:
+                try:
+                    fs = get_style_fontsize(el)
+                    weight = len(el.value()) if el.value() else 0
+
+                    list_of_sizes[fs] = list_of_sizes.setdefault(fs, 0) + weight
+                except:
+                    pass
+
+            sorted_list_of_sizes = list(collections.OrderedDict(sorted(list_of_sizes.iteritems(), key=lambda t: t[0])))
+            font_size_to_check = font_size
+
+            if len(sorted_list_of_sizes) > 0:
+                if sorted_list_of_sizes[0] != font_size:
+                    return sorted_list_of_sizes[0] in self.doc.possible_headers
+
+            return font_size in self.doc.possible_headers
 
 
     def get_header(self, elem, style, node):
+        """Returns HTML tag representing specific header for this element.
 
+        :Returns:
+          String representation of HTML tag.
+
+        """
         font_size = style
-
         if hasattr(elem, 'possible_header'):
             if elem.possible_header:
                 return 'h1'
@@ -632,30 +884,15 @@ class HeaderContext:
             return 'h6'
 
         if hasattr(style, 'style_id'):
-            font_size = style.get_font_size() 
+            font_size = _get_font_size(self.doc, style)
 
         try:
+            if font_size in self.doc.possible_headers_style:
+                return 'h{}'.format(self.doc.possible_headers_style.index(font_size)+1)
+
             return 'h{}'.format(self.doc.possible_headers.index(font_size)+1)
         except ValueError:
             return 'h6'
-
-        # for idx, st in enumerate(self.header_sizes):
-        #     if style:
-        #         if hasattr(style, 'style_id'):
-        #             if style.style_id in st:
-        #                 n = idx + 1
-        #                 if n > 6:
-        #                     n = 6
-        #                 return 'h{}'.format(n)
-        #         else:
-        #             if style in st:
-        #                 n = idx + 1
-        #                 if n > 6:
-        #                     n = 6
-        #                 return 'h{}'.format(n)
-
-        # return 'h2'
-
 
 
 # Default options
@@ -676,12 +913,29 @@ DEFAULT_OPTIONS = {
     'hooks': {},
     'header': HeaderContext,
     'scale_to_size': None,
-    'empty_paragraph_as_nbsp': False
+    'empty_paragraph_as_nbsp': False,
+    'embed_styles': True
 }
 
 
 class Context:
-    def __init__(self, document,options=None):
+    """Context object used during the serialization.
+
+    It is used to hold needed information like hooks, serializers, extra options and temporary information.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - options (dict): Optional dictionary with options
+
+    Options:
+      - serializers (dict):!
+      - hooks (dict):
+      - header (:class:`HeaderContext`): Reference to a class
+      - scale_to_size: None is a default option. If defined as int will be used as base font size for the text
+      - empty_paragraph_as_nbsp: False is a default option. If True it will insert &nbsp; inside of empty paragraphs
+    """
+
+    def __init__(self, document, options=None):
         self.options = dict(DEFAULT_OPTIONS)
 
         if options:
@@ -702,13 +956,34 @@ class Context:
             if 'empty_paragraph_as_nbsp' in options:
                 self.options['empty_paragraph_as_nbsp'] = options['empty_paragraph_as_nbsp']
 
+            if 'embed_styles' in options:
+                self.options['embed_styles'] = options['embed_styles']
+
         self.reset()
         self.header.init(document)
 
     def get_hook(self, name):
+        """Get reference to a specific hook.
+
+        :Args:
+          - name (str): Hook name
+
+        :Returns:
+          List with defined hooks. None if it is not found.
+        """
+
         return self.options['hooks'].get(name, None)
 
     def get_serializer(self, node):
+        """Returns serializer for specific element.
+
+        :Args:
+          - node (:class:`ooxml.doc.Element`): Element object 
+
+        :Returns:
+          Returns reference to a function which will be used for serialization.
+        """
+
         return self.options['serializers'].get(type(node), None)
 
         if type(node) in self.options['serializers']:
@@ -728,7 +1003,28 @@ class Context:
 
 # Serialize style into CSS
 
+###############################################################################
+## SERIALIZERS
+###############################################################################
+
 def serialize_styles(document, prefix='', options=None):
+    """
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - prefix (str): Optional prefix used for 
+      - options (dict): Optional dictionary with :class:`Context` options
+
+    :Returns:
+        CSS styles as string.
+
+    >>> serialize_styles(doc)
+    p { color: red; }
+
+    >>> serialize_styles(doc, '#editor')
+    #editor p { color: red; }
+
+    """
     all_styles = []
     css_content = ''
 
@@ -746,12 +1042,12 @@ def serialize_styles(document, prefix='', options=None):
 
     ctx = Context(document, options=options)
 
-    for style_type, style_id in six.iteritems(document.styles.default_styles):
+    for style_type, style_id in six.iteritems(document.styles.default_styles):        
         if style_type == 'table':
             n = ["table"]
             css_content += _generate(ctx, style_id, n)
         elif style_type == 'paragraph':
-            n = ["p", "div", "span"]
+            n = ["p", "div"] #  n = ["p", "div", "span"]
             css_content += _generate(ctx, style_id, n)            
         elif style_type == 'character':
             n = ["span"]
@@ -765,13 +1061,35 @@ def serialize_styles(document, prefix='', options=None):
     # get style content for all styles
     for style_id in set(all_styles):
         style = document.styles.get_by_id(style_id)
-        css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), get_style_css(ctx, style, embed=False))
+        styles = []
+
+        while True:
+            styles.insert(0, style)
+
+            if style.based_on:
+                style = document.styles.get_by_id(style.based_on)
+            else:
+                break
+
+        content = "\n".join([get_style_css(ctx, st, embed=False) for st in styles])
+
+        css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), content)
 
     return css_content
 
 # Serialize list of elements into HTML
 
 def serialize_elements(document, elements, options=None):
+    """Serialize list of elements into HTML string.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - elements (list): List of elements
+      - options (dict): Optional dictionary with :class:`Context` options
+
+    :Returns:
+      Returns HTML representation of the document.
+    """    
     ctx = Context(document, options)
 
     tree_root = root = etree.Element('div')
@@ -788,5 +1106,14 @@ def serialize_elements(document, elements, options=None):
     return etree.tostring(tree_root, pretty_print=True, encoding="utf-8", xml_declaration=False)
 
 
-def serialize(document, options=None):    
+def serialize(document, options=None):
+    """Serialize entire document into HTML string.
+
+    :Args:
+      - document (:class:`ooxml.doc.Document`): Document object
+      - options (dict): Optional dictionary with :class:`Context` options
+
+    :Returns:
+      Returns HTML representation of the document.
+    """
     return serialize_elements(document, document.elements, options)

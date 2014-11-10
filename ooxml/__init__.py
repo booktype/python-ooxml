@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+VERSION = '0.10'
+
 NAMESPACES = {
     'mo': 'http://schemas.microsoft.com/office/mac/office/2008/main',
     'o':  'urn:schemas-microsoft-com:office:office',
@@ -36,6 +38,14 @@ NAMESPACES = {
 
 
 def read_from_file(file_name):
+    """Parser OOXML file and returns parsed document.
+    
+    :Args:
+      - file_name (str): Path to OOXML file
+
+    :Returns:
+      Returns object of type :class:`ooxml.docx.DOCXFile`.
+    """
     from .docxfile import DOCXFile
 
     dfile = DOCXFile(file_name)
