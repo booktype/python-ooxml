@@ -13,7 +13,7 @@ setup(
 
     license = 'GNU Affero General Public License',
     description = 'Python-OOXML is a Python library for parsing Office Open XML files.',
-    long_description = open('README.md').read(),
+    long_description = open('README.rst').read(),
     keywords = ['ooxml', 'docx'],
 
     classifiers = [
