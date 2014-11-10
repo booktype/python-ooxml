@@ -96,7 +96,7 @@ class TestSerializeLinkElements(unittest.TestCase):
         elem = _create_elem([link])
 
         serialize_link(context, self.doc, elem, self.root)
-        fire_mock.assert_called_once_with(context, self.doc, ANY, None)
+        fire_mock.assert_called_once_with(context, self.doc, ANY, ANY, None)
 
 
 # serialize_break
@@ -112,7 +112,10 @@ class TestSerializeBreakElements(unittest.TestCase):
         instance = MockContext.return_value
         instance.get_hook.return_value = None
 
-        ret = serialize_break(instance, self.doc, None, self.root)
+        br = _create_elem([])
+        br.break_type = 'textWrapping'
+
+        ret = serialize_break(instance, self.doc, br, self.root)
         self.assertEqual(ret, self.root)        
 
     @patch('ooxml.serialize.fire_hooks')
@@ -121,8 +124,23 @@ class TestSerializeBreakElements(unittest.TestCase):
         instance = MockContext.return_value
         instance.get_hook.return_value = None
 
-        ret = serialize_break(instance, self.doc, None, self.root)
+        br = _create_elem([])
+        br.break_type = 'page'
+
+        ret = serialize_break(instance, self.doc, br, self.root)
         self.assertEqual(_render(ret), six.b('<div><span style="page-break-after: always;"/></div>'))
+
+    @patch('ooxml.serialize.fire_hooks')
+    @patch('ooxml.serialize.Context')    
+    def test_content_break_line(self, MockContext, fire_mock):
+        instance = MockContext.return_value
+        instance.get_hook.return_value = None
+
+        br = _create_elem([])
+        br.break_type = 'textWrapping'
+
+        ret = serialize_break(instance, self.doc, br, self.root)
+        self.assertEqual(_render(ret), six.b('<div><br/></div>'))
 
     @patch('ooxml.serialize.fire_hooks')
     @patch('ooxml.serialize.Context')    
@@ -130,8 +148,11 @@ class TestSerializeBreakElements(unittest.TestCase):
         instance = MockContext.return_value
         instance.get_hook.return_value = None
 
-        serialize_break(instance, self.doc, None, self.root)
-        fire_mock.assert_called_once_with(instance, self.doc, ANY, None)
+        br = _create_elem([])
+        br.break_type = 'textWrapping'
+
+        serialize_break(instance, self.doc, br, self.root)
+        fire_mock.assert_called_once_with(instance, self.doc, br, ANY, ANY)
 
 
 # serialize_elements
