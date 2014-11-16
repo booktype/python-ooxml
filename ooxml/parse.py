@@ -521,19 +521,20 @@ def parse_footnotes(document, xmlcontent):
     Footnotes are defined in file 'footnotes.xml'
     """
 
-    styles = etree.fromstring(xmlcontent)
+    footnotes = etree.fromstring(xmlcontent)
     document.footnotes = {}
 
-    for style in styles.xpath('.//w:footnote', namespaces=NAMESPACES):
-        _type = style.attrib.get(_name('{{{w}}}type'), None)
+    for footnote in footnotes.xpath('.//w:footnote', namespaces=NAMESPACES):
+        _type = footnote.attrib.get(_name('{{{w}}}type'), None)
 
         # don't know what to do with these now
         if _type in ['separator', 'continuationSeparator', 'continuationNotice']:
             continue
 
-        p = parse_paragraph(document, style.find(_name('{{{w}}}p')))
+#        p = parse_paragraph(document, footnote.find(_name('{{{w}}}p')))
+        paragraphs = [parse_paragraph(document, para) for para in footnote.xpath('.//w:p', namespaces=NAMESPACES)]
 
-        document.footnotes[style.attrib[_name('{{{w}}}id')]] = p
+        document.footnotes[footnote.attrib[_name('{{{w}}}id')]] = paragraphs
 
 
 def parse_endnotes(document, xmlcontent):

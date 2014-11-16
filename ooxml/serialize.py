@@ -675,11 +675,6 @@ def serialize_symbol(ctx, document, el, root):
 def serialize_footnote(ctx, document, el, root):
     "Serializes footnotes."
 
-    p_foot = document.footnotes[el.rid]
-
-    p = etree.Element('p')
-    foot_doc = serialize_paragraph(ctx, document, p_foot, p)
-    # must put content of the footter somewhere
     footnote_num = el.rid
 
     if el.rid not in ctx.footnote_list:
