@@ -154,6 +154,7 @@ class Document(object):
         self.elements = []
         self.relationships = {}
         self.footnotes = {}
+        self.endnotes = {}
         self.numbering = {}
         self.abstruct_numbering = {}
         self.styles = StylesCollection()
@@ -283,6 +284,18 @@ class Footnote(Element):
 
     def __init__(self, rid):
         super(Footnote, self).__init__()
+
+        self.rid = rid
+
+    def value(self):
+        return self.rid
+
+
+class Endnote(Element):
+    "Represents endnote element."
+
+    def __init__(self, rid):
+        super(Endnote, self).__init__()
 
         self.rid = rid
 

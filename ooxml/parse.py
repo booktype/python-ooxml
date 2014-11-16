@@ -196,6 +196,15 @@ def parse_footnote(document, container, elem):
     container.elements.append(foot)
 
 
+def parse_endnote(document, container, elem):
+    "Parse the endnote element."
+
+    _rid =  elem.attrib[_name('{{{w}}}id')]
+
+    note = doc.Endnote(_rid)
+    container.elements.append(note)
+
+
 def parse_alternate(document, container, elem):
     txtbx = elem.find('.//'+_name('{{{w}}}txbxContent'))
     paragraphs = []
@@ -255,6 +264,11 @@ def parse_text(document, container, element):
 
     if foot is not None:
         parse_footnote(document, container, foot)
+
+    end = element.find(_name('{{{w}}}endnoteReference'))
+
+    if end is not None:
+        parse_endnote(document, container, end)
 
     sym = element.find(_name('{{{w}}}sym'))
 
@@ -522,6 +536,21 @@ def parse_footnotes(document, xmlcontent):
         document.footnotes[style.attrib[_name('{{{w}}}id')]] = p
 
 
+def parse_endnotes(document, xmlcontent):
+    """Parse endnotes document.
+
+    Endnotes are defined in file 'endnotes.xml'
+    """
+
+    endnotes = etree.fromstring(xmlcontent)
+    document.endnotes = {}
+
+    for note in endnotes.xpath('.//w:endnote', namespaces=NAMESPACES):
+        paragraphs = [parse_paragraph(document, para) for para in note.xpath('.//w:p', namespaces=NAMESPACES)]
+
+        document.endnotes[note.attrib[_name('{{{w}}}id')]] = paragraphs
+
+
 def parse_numbering(document, xmlcontent):
     """Parse numbering document.
 
@@ -589,6 +618,12 @@ def parse_from_file(file_object):
         parse_footnotes(document, footnotes_content)    
     except KeyError:
         logger.warning('Could not read footnotes.')
+
+    try:    
+        endnotes_content = file_object.read_file('endnotes.xml')
+        parse_endnotes(document, endnotes_content)    
+    except KeyError:
+        logger.warning('Could not read endnotes.')
 
     try:
         numbering_content = file_object.read_file('numbering.xml')

@@ -347,8 +347,9 @@ def get_style_fontsize(node):
       Font size as int number or 0 if it is not defined
 
     """
-    if 'sz' in node.rpr:
-        return int(node.rpr['sz']) / 2
+    if hasattr(node, 'rpr'):
+        if 'sz' in node.rpr:
+            return int(node.rpr['sz']) / 2
 
     return 0
 
@@ -697,6 +698,27 @@ def serialize_footnote(ctx, document, el, root):
     return root
 
 
+def serialize_endnote(ctx, document, el, root):
+    "Serializes endnotes."
+
+    footnote_num = el.rid
+
+    if el.rid not in ctx.endnote_list:
+        ctx.endnote_id += 1
+        ctx.endnote_list[el.rid] = ctx.endnote_id
+
+    footnote_num = ctx.endnote_list[el.rid]
+
+    note = etree.SubElement(root, 'sup')
+    link = etree.SubElement(note, 'a')
+    link.set('href', '#')
+    link.text = u'{}'.format(footnote_num)
+
+    fire_hooks(ctx, document, el, note, ctx.get_hook('endnote'))
+
+    return root
+
+
 def serialize_table(ctx, document, table, root):
     """Serializes table element.
     """
@@ -907,6 +929,7 @@ DEFAULT_OPTIONS = {
         doc.Break: serialize_break,
         doc.TextBox: serialize_textbox,
         doc.Footnote: serialize_footnote,
+        doc.Endnote: serialize_endnote,
         doc.Symbol: serialize_symbol
     },
 
@@ -997,6 +1020,8 @@ class Context:
 
         self.footnote_id = 0
         self.footnote_list = {}
+        self.endnote_id = 0
+        self.endnote_list = {}
 
         self.in_list = []
         self.header = self.options['header']()
