@@ -26,5 +26,7 @@ setup(
 
     install_requires = [
        "lxml", "six"
-    ]
+    ],
+
+    test_suite = "tests"
 )
