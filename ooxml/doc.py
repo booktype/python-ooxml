@@ -155,6 +155,7 @@ class Document(object):
         self.relationships = {}
         self.footnotes = {}
         self.endnotes = {}
+        self.comments = {}
         self.numbering = {}
         self.abstruct_numbering = {}
         self.styles = StylesCollection()
@@ -166,6 +167,15 @@ class Document(object):
         self.possible_headers_style = []
         self.possible_headers = []
         self.possible_text = []
+
+
+class CommentContent:
+    def __init__(self, cid):
+        self.cid = cid
+        self.text = ''
+        self.elements = []
+        self.date = None
+        self.author = None
 
 
 class Element(object):
@@ -277,6 +287,19 @@ class Table(Element):
 
     def value(self):
         return self.rows
+
+
+class Comment(Element):
+    "Represents comment element."
+
+    def __init__(self, cid, comment_type):
+        super(Comment, self).__init__()
+
+        self.cid = cid
+        self.comment_type = comment_type
+
+    def value(self):
+        return self.cid
 
 
 class Footnote(Element):

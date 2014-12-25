@@ -310,6 +310,14 @@ def parse_paragraph(document, par):
             _m = doc.Math()
             paragraph.elements.append(_m)
 
+        if elem.tag == _name('{{{w}}}commentRangeStart'):
+            _m = doc.Comment(elem.attrib[_name('{{{w}}}id')], 'start')
+            paragraph.elements.append(_m)
+
+        if elem.tag == _name('{{{w}}}commentRangeEnd'):
+            _m = doc.Comment(elem.attrib[_name('{{{w}}}id')], 'end')
+            paragraph.elements.append(_m)
+
         if elem.tag == _name('{{{w}}}hyperlink'):
             try:
                 t = doc.Link(elem.attrib[_name('{{{r}}}id')])
@@ -515,6 +523,30 @@ def parse_style(document, xmlcontent):
            parse_paragraph_properties(document, st, ppr)
 
 
+def parse_comments(document, xmlcontent):
+    """Parse comments document.
+
+    Comments are defined in file 'comments.xml'
+    """
+
+    comments = etree.fromstring(xmlcontent)
+    document.comments = {}
+
+    for comment in comments.xpath('.//w:comment', namespaces=NAMESPACES):
+        # w:author
+        # w:id
+        # w: date
+        comment_id = comment.attrib[_name('{{{w}}}id')]
+
+        comm = doc.CommentContent(comment_id)
+        comm.author = comment.attrib.get(_name('{{{w}}}author'), None)
+        comm.date = comment.attrib.get(_name('{{{w}}}date'), None)
+
+        comm.elements = [parse_paragraph(document, para) for para in comment.xpath('.//w:p', namespaces=NAMESPACES)]
+
+        document.comments[comment_id] = comm
+
+
 def parse_footnotes(document, xmlcontent):
     """Parse footnotes document.
 
@@ -531,7 +563,6 @@ def parse_footnotes(document, xmlcontent):
         if _type in ['separator', 'continuationSeparator', 'continuationNotice']:
             continue
 
-#        p = parse_paragraph(document, footnote.find(_name('{{{w}}}p')))
         paragraphs = [parse_paragraph(document, para) for para in footnote.xpath('.//w:p', namespaces=NAMESPACES)]
 
         document.footnotes[footnote.attrib[_name('{{{w}}}id')]] = paragraphs
@@ -613,6 +644,12 @@ def parse_from_file(file_object):
         parse_relationship(document, doc_rel_content)
     except KeyError:
         logger.warning('Could not read relationships.')
+
+    try:    
+        comments_content = file_object.read_file('comments.xml')
+        parse_comments(document, comments_content)    
+    except KeyError:
+        logger.warning('Could not read footnotes.')
 
     try:    
         footnotes_content = file_object.read_file('footnotes.xml')

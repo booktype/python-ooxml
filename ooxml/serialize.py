@@ -568,9 +568,16 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 new_element, _element = _add_formatting('u', new_element, _element)
                 
                 _element.text = el.value()
+
+                for comment_id in ctx.opened_comments:
+                    document.comments[comment_id].text += ' ' + el.value()
             else:
                 new_element = etree.Element('span')
                 new_element.text = el.value()
+
+                for comment_id in ctx.opened_comments:
+                    document.comments[comment_id].text += ' ' + el.value()
+
 
             if ctx.options['embed_styles']:
                 if _text_style != '':
@@ -689,6 +696,26 @@ def serialize_footnote(ctx, document, el, root):
     link.text = u'{}'.format(footnote_num)
 
     fire_hooks(ctx, document, el, note, ctx.get_hook('footnote'))
+
+    return root
+
+
+def serialize_comment(ctx, document, el, root):
+    "Serializes comment."
+
+    if el.comment_type == 'end':
+        ctx.opened_comments.remove(el.cid)
+    else:
+        ctx.opened_comments.append(el.cid)
+
+        link = etree.SubElement(root, 'a')
+        link.set('href', '#')
+        link.set('class', 'comment-link')    
+        link.set('id', 'comment-id-' + el.cid)    
+
+        link.text = ''
+
+        fire_hooks(ctx, document, el, link, ctx.get_hook('comment'))
 
     return root
 
@@ -923,6 +950,7 @@ DEFAULT_OPTIONS = {
         doc.Math: serialize_math,
         doc.Break: serialize_break,
         doc.TextBox: serialize_textbox,
+        doc.Comment: serialize_comment,
         doc.Footnote: serialize_footnote,
         doc.Endnote: serialize_endnote,
         doc.Symbol: serialize_symbol
@@ -1013,6 +1041,7 @@ class Context:
         self.ilvl = None
         self.numid = None
 
+        self.opened_comments = []
         self.footnote_id = 0
         self.footnote_list = {}
         self.endnote_id = 0
