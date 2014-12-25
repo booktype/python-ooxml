@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name = 'Python-OOXML',
-    version = '0.10',
+    version = '0.11',
 
     author = 'Aleksandar Erkalovic',
     author_email = 'aerkalov@gmail.com',
@@ -26,5 +26,7 @@ setup(
 
     install_requires = [
        "lxml", "six"
-    ]
+    ],
+
+    test_suite = "tests"
 )
