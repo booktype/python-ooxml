@@ -473,3 +473,13 @@ class Math(Element):
     def value(self):
         return ''
 
+
+class SmartTag(Element):
+    "Represents SmartTag element."
+
+    def __init__(self):
+        self.elements = []
+        self.element = ''
+
+    def value(self):
+        return ''

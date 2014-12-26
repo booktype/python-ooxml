@@ -286,6 +286,25 @@ def parse_text(document, container, element):
     return
 
 
+def parse_smarttag(document, container, tag_elem):
+    "Parse the endnote element."
+
+    tag = doc.SmartTag()
+
+    tag.element = tag_elem.attrib[_name('{{{w}}}element')]
+
+    for elem in tag_elem:
+        if elem.tag == _name('{{{w}}}r'):
+            parse_text(document, tag, elem)      
+
+        if elem.tag == _name('{{{w}}}smartTag'):
+            parse_smarttag(document, tag, elem)            
+
+    container.elements.append(tag)
+
+    return
+
+
 def parse_paragraph(document, par):
     """Parse paragraph element.
 
@@ -327,6 +346,9 @@ def parse_paragraph(document, par):
                 paragraph.elements.append(t)            
             except:
                 logger.error('Error with with hyperlink [%s].', str(elem.attrib.items()))
+
+        if elem.tag == _name('{{{w}}}smartTag'):
+            parse_smarttag(document, paragraph, elem)            
 
     return paragraph
 

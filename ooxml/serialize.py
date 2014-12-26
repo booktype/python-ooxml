@@ -703,19 +703,22 @@ def serialize_footnote(ctx, document, el, root):
 def serialize_comment(ctx, document, el, root):
     "Serializes comment."
 
+    # Check if option is turned on
+
     if el.comment_type == 'end':
         ctx.opened_comments.remove(el.cid)
     else:
         ctx.opened_comments.append(el.cid)
 
-        link = etree.SubElement(root, 'a')
-        link.set('href', '#')
-        link.set('class', 'comment-link')    
-        link.set('id', 'comment-id-' + el.cid)    
+        if ctx.options['comment_span']:
+            link = etree.SubElement(root, 'a')
+            link.set('href', '#')
+            link.set('class', 'comment-link')    
+            link.set('id', 'comment-id-' + el.cid)    
 
-        link.text = ''
+            link.text = ''
 
-        fire_hooks(ctx, document, el, link, ctx.get_hook('comment'))
+            fire_hooks(ctx, document, el, link, ctx.get_hook('comment'))
 
     return root
 
@@ -737,6 +740,37 @@ def serialize_endnote(ctx, document, el, root):
     link.text = u'{}'.format(footnote_num)
 
     fire_hooks(ctx, document, el, note, ctx.get_hook('endnote'))
+
+    return root
+
+
+def serialize_smarttag(ctx, document, el, root):
+    "Serializes smarttag."
+
+    if ctx.options['smarttag_span']:
+        _span = etree.SubElement(root, 'span', {'class': 'smarttag', 'data-smarttag-element': el.element})
+    else:
+        _span = root
+
+    for elem in el.elements:
+        _ser = ctx.get_serializer(elem)
+
+        if _ser:
+            _td = _ser(ctx, document, elem, _span)
+        else:
+            if isinstance(elem, doc.Text):
+                children = list(_span)
+
+                if len(children) == 0:
+                    _text = _span.text or u''
+
+                    _span.text = u'{}{}'.format(_text, elem.text)
+                else:
+                    _text = children[-1].tail or u''
+
+                    children[-1].tail = u'{}{}'.format(_text, elem.text)
+
+    fire_hooks(ctx, document, el, _span, ctx.get_hook('smarttag'))
 
     return root
 
@@ -953,14 +987,17 @@ DEFAULT_OPTIONS = {
         doc.Comment: serialize_comment,
         doc.Footnote: serialize_footnote,
         doc.Endnote: serialize_endnote,
-        doc.Symbol: serialize_symbol
+        doc.Symbol: serialize_symbol,
+        doc.SmartTag: serialize_smarttag
     },
 
     'hooks': {},
     'header': HeaderContext,
     'scale_to_size': None,
     'empty_paragraph_as_nbsp': False,
-    'embed_styles': True
+    'embed_styles': True,
+    'smarttag_span': False,
+    'comment_span': False
 }
 
 
@@ -985,25 +1022,11 @@ class Context:
         self.options = dict(DEFAULT_OPTIONS)
 
         if options:
-            if 'serializers' in options:
-                self.options['serializers'].update(options['serializers'])
-
-            if 'hooks' in options:
-                self.options['hooks'].update(options['hooks'])
-
-            # this is not that good way of updating options
-
-            if 'header' in options:
-                self.options['header'] = options['header']
-
-            if 'scale_to_size' in options:
-                self.options['scale_to_size'] = options['scale_to_size']
-
-            if 'empty_paragraph_as_nbsp' in options:
-                self.options['empty_paragraph_as_nbsp'] = options['empty_paragraph_as_nbsp']
-
-            if 'embed_styles' in options:
-                self.options['embed_styles'] = options['embed_styles']
+            for opt_key, opt_value in six.iteritems(options):
+                if type(opt_value) == type({}):
+                    self.options[opt_key].update(opt_value)
+                else:
+                    self.options[opt_key] = opt_value
 
         self.reset()
         self.header.init(document)
