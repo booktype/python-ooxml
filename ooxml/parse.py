@@ -255,9 +255,7 @@ def parse_text(document, container, element):
         # Notice it is using txt as container
         parse_previous_properties(document, txt, rpr)
 
-    r = element.find(_name('{{{w}}}r'))
-
-    if r is not None:
+    for r in element.findall(_name('{{{w}}}r')):
         parse_text(document, container, r)
 
     foot = element.find(_name('{{{w}}}footnoteReference'))

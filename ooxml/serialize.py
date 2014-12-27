@@ -272,9 +272,24 @@ def serialize_link(ctx, document, elem, root):
 
     _a = etree.SubElement(root, 'a')
 
-    # this should not take just first element
-    if len(elem.elements) > 0:
-        _a.text = elem.elements[0].value()
+    for el in elem.elements:
+        _ser = ctx.get_serializer(el)
+
+        if _ser:
+            _td = _ser(ctx, document, el, _a)
+        else:
+            if isinstance(el, doc.Text):
+                children = list(_a)
+
+                if len(children) == 0:
+                    _text = _a.text or u''
+
+                    _a.text = u'{}{}'.format(_text, el.value())
+                else:
+                    _text = children[-1].tail or u''
+
+                    children[-1].tail = u'{}{}'.format(_text, el.value())
+
     _a.set('href', document.relationships[elem.rid]['target'])
 
     fire_hooks(ctx, document, elem, _a, ctx.get_hook('a'))
