@@ -614,12 +614,13 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                     children[-1].text = u'{}{}'.format(txt, txt2)  
                     was_inserted = True
 
-                if _style == '' and _text_style == '' and new_element.tag == 'span':
-                    _e = children[-1]
+                if not was_inserted:
+                    if _style == '' and _text_style == '' and new_element.tag == 'span':
+                        _e = children[-1]
 
-                    txt = _e.tail or ''
-                    _e.tail = u'{}{}'.format(txt, new_element.text)
-                    was_inserted = True
+                        txt = _e.tail or ''
+                        _e.tail = u'{}{}'.format(txt, new_element.text)
+                        was_inserted = True
 
             if not was_inserted:
                 if _style == '' and _text_style == '' and new_element.tag == 'span':
