@@ -795,6 +795,12 @@ def serialize_table(ctx, document, table, root):
     """Serializes table element.
     """
 
+    # What we should check really is why do we pass None as root element
+    # There is a good chance some content is missing after the import
+    
+    if root is None:
+        return root
+
     if ctx.ilvl != None:
         root = close_list(ctx, root)
         ctx.ilvl, ctx.numid = None, None
