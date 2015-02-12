@@ -724,7 +724,8 @@ def serialize_comment(ctx, document, el, root):
     if el.comment_type == 'end':
         ctx.opened_comments.remove(el.cid)
     else:
-        ctx.opened_comments.append(el.cid)
+        if el.comment_type != 'reference':
+            ctx.opened_comments.append(el.cid)
 
         if ctx.options['comment_span']:
             link = etree.SubElement(root, 'a')

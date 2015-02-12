@@ -281,6 +281,12 @@ def parse_text(document, container, element):
     if image is not None:
         parse_drawing(document, container, image)
 
+    refe = element.find(_name('{{{w}}}commentReference'))
+
+    if refe is not None:
+        _m = doc.Comment(refe.attrib[_name('{{{w}}}id')], 'reference')
+        container.elements.append(_m)
+
     return
 
 
