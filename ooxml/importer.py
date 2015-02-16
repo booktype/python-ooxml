@@ -447,8 +447,10 @@ def get_chapters(doc, options=None, serialize_options=None):
     chapters = split_document(context, doc)
 
     if context.options.get('scale_font_size', False):
-        if len(doc.possible_text) > 0:
-            serialize_options['scale_to_size'] = doc.possible_text[0]
+        if doc.base_font_size != -1:
+            serialize_options['scale_to_size'] = doc.base_font_size
+        elif len(doc.possible_text) > 0:
+            serialize_options['scale_to_size'] = doc.possible_text[-1]
 
     export_chapters = []
     idx = 0

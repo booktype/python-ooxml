@@ -132,12 +132,16 @@ class Document(object):
 
         self.possible_headers_style = [x for x in reversed(sorted(_headers))]
 
+        _text_list = collections.Counter()
+
         for font_size, amount in six.iteritems(self.usage_font_size):
             if float(amount) / max_count <= 0.1:                
                 if font_size not in _headers:
                     _headers.append(font_size)
             else:
+                # This will require some cleanup
                 _text.append(font_size)
+                _text_list[font_size] = amount
 
         self.possible_headers = [x for x in reversed(sorted(_headers))]
         self.possible_text = [x for x in reversed(sorted(_text))]
@@ -149,6 +153,10 @@ class Document(object):
                     self.possible_headers.remove(value)
 #                    self.possible_headers_style.remove(value)
 
+        _mc = _text_list.most_common(1)
+
+        if len(_mc) > 0:
+            self.base_font_size = _mc[0][0]
 
     def reset(self):
         self.elements = []
@@ -167,6 +175,7 @@ class Document(object):
         self.possible_headers_style = []
         self.possible_headers = []
         self.possible_text = []
+        self.base_font_size = -1
 
 
 class CommentContent:
