@@ -139,7 +139,8 @@ DEFAULT_OPTIONS = {
     'maximum_frontmatter_times': 5,
     'squash_frontmatter': True,
     'maximum_eat_marker': 100,
-    'squash_small_blocks': True
+    'squash_small_blocks': True,
+    'scale_font_size': False
 
 }
 
@@ -407,11 +408,6 @@ def get_chapters(doc, options=None, serialize_options=None):
     context = ImporterContext(options)
 
     def _serialize_chapter(idx, els, is_frontmatter):        
-        options = {'empty_paragraph_as_nbsp': True}
-
-        if len(doc.possible_text) > 0:
-            options['scale_to_size'] = doc.possible_text[0]
-
         s =  serialize.serialize_elements(doc, els, options=serialize_options)
 
         if s.startswith(six.b('<div/>')):
@@ -449,6 +445,10 @@ def get_chapters(doc, options=None, serialize_options=None):
         return (chapter_title, etree.tostring(body, pretty_print=True, encoding="utf-8", xml_declaration=False))
 
     chapters = split_document(context, doc)
+
+    if context.options.get('scale_font_size', False):
+        if len(doc.possible_text) > 0:
+            serialize_options['scale_to_size'] = doc.possible_text[0]
 
     export_chapters = []
     idx = 0

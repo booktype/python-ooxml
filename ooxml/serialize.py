@@ -422,11 +422,12 @@ def get_style_css(ctx, node, embed=True):
     if 'sz' in node.rpr:
         size = int(node.rpr['sz']) / 2
 
-        if ctx.options['scale_to_size']:
-            scale = int(round(size) / ctx.options['scale_to_size'] * 100.0)
-            style.append('font-size: {}%'.format(scale))
-        else:
-            style.append('font-size: {}pt'.format(size))
+        if ctx.options['embed_fontsize']:
+            if ctx.options['scale_to_size']:
+                scale = int(round(size) / ctx.options['scale_to_size'] * 100.0)
+                style.append('font-size: {}%'.format(scale))
+            else:
+                style.append('font-size: {}pt'.format(size))
 
     if 'ind' in node.ppr:
         if 'left' in node.ppr['ind']:
@@ -798,7 +799,7 @@ def serialize_table(ctx, document, table, root):
 
     # What we should check really is why do we pass None as root element
     # There is a good chance some content is missing after the import
-    
+
     if root is None:
         return root
 
@@ -1019,6 +1020,7 @@ DEFAULT_OPTIONS = {
     'scale_to_size': None,
     'empty_paragraph_as_nbsp': False,
     'embed_styles': True,
+    'embed_fontsize': True,
     'smarttag_span': False,
     'comment_span': False
 }
