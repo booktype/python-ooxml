@@ -290,7 +290,8 @@ def serialize_link(ctx, document, elem, root):
 
                     children[-1].tail = u'{}{}'.format(_text, el.value())
 
-    _a.set('href', document.relationships[elem.rid]['target'])
+    if elem.rid in document.relationships:
+        _a.set('href', document.relationships[elem.rid].get('target', ''))
 
     fire_hooks(ctx, document, elem, _a, ctx.get_hook('a'))
 
@@ -303,13 +304,14 @@ def serialize_image(ctx, document, elem, root):
     This is not abstract enough.
     """
 
-    img_src = document.relationships[elem.rid]['target']
-
-    img_name, img_extension = os.path.splitext(img_src)
-
     _img = etree.SubElement(root, 'img')
     # make path configurable
-    _img.set('src', 'static/{}{}'.format(elem.rid, img_extension))
+
+    if elem.rid in document.relationships:
+        img_src = document.relationships[elem.rid].get('target', '')
+        img_name, img_extension = os.path.splitext(img_src)
+
+        _img.set('src', 'static/{}{}'.format(elem.rid, img_extension))
 
     fire_hooks(ctx, document, elem, _img, ctx.get_hook('img'))
 
