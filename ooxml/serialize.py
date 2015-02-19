@@ -1024,7 +1024,8 @@ DEFAULT_OPTIONS = {
     'embed_styles': True,
     'embed_fontsize': True,
     'smarttag_span': False,
-    'comment_span': False
+    'comment_span': False,
+    'pretty_print': True
 }
 
 
@@ -1202,7 +1203,7 @@ def serialize_elements(document, elements, options=None):
     # TODO:
     # - create footnotes now
 
-    return etree.tostring(tree_root, pretty_print=True, encoding="utf-8", xml_declaration=False)
+    return etree.tostring(tree_root, pretty_print=ctx.options.get('pretty_print', True), encoding="utf-8", xml_declaration=False)
 
 
 def serialize(document, options=None):
