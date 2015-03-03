@@ -31,6 +31,7 @@ Hooks:
 import os.path
 import six
 import collections
+import math
 
 from lxml import etree
 from . import doc
@@ -425,8 +426,9 @@ def get_style_css(ctx, node, embed=True):
         size = int(node.rpr['sz']) / 2
 
         if ctx.options['embed_fontsize']:
-            if ctx.options['scale_to_size']:
-                scale = int(round(size) / ctx.options['scale_to_size'] * 100.0)
+            if ctx.options['scale_to_size']:                
+                multiplier = size-ctx.options['scale_to_size']
+                scale = 100 + int(math.trunc(8.3*multiplier))
                 style.append('font-size: {}%'.format(scale))
             else:
                 style.append('font-size: {}pt'.format(size))
