@@ -180,11 +180,14 @@ def parse_drawing(document, container, elem):
     We don't do much with drawing element. We can find embeded image but we don't do more than that.
     """
 
-    blip = elem.xpath('.//a:blip', namespaces=NAMESPACES)[0]        
-    _rid =  blip.attrib[_name('{{{r}}}embed')]
+    _blip = elem.xpath('.//a:blip', namespaces=NAMESPACES)
 
-    img = doc.Image(_rid)
-    container.elements.append(img)
+    if len(_blip) > 0:
+        blip = _blip[0]
+        _rid =  blip.attrib[_name('{{{r}}}embed')]
+
+        img = doc.Image(_rid)
+        container.elements.append(img)
 
 
 def parse_footnote(document, container, elem):
