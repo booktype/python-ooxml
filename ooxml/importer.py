@@ -407,7 +407,7 @@ def get_chapters(doc, options=None, serialize_options=None):
 
     context = ImporterContext(options)
 
-    def _serialize_chapter(idx, els, is_frontmatter):        
+    def _serialize_chapter(idx, els, is_frontmatter):
         s =  serialize.serialize_elements(doc, els, options=serialize_options)
 
         if s.startswith(six.b('<div/>')):
@@ -418,17 +418,29 @@ def get_chapters(doc, options=None, serialize_options=None):
         chapter_title = ''
 
         if not is_frontmatter:
-            if body[0].tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:            
+            if body[0].tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']: 
+                need_classes = True if body[0].tag == 'h1' else False
+
                 body[0].tag = 'h1'
                 # get text content of first header
                 chapter_title = body[0].text_content().strip()
                 # clears it up and set new content
                 # this is when we have different html tags in the header
                 # this also clears attributes
-                
+
+                _style = body[0].attrib.get('style', None)
+                _class = body[0].attrib.get('class', None)
+
                 body[0].clear()
 
                 body[0].text = chapter_title
+
+                if need_classes:
+                    if _style:
+                        body[0].set('style', _style)
+
+                    if _class:
+                        body[0].set('class', _class)
             else:
                 if idx > 0:  
                     title =  etree.Element('h1')
