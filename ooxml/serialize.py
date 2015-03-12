@@ -372,7 +372,7 @@ def get_style_fontsize(node):
     return 0
 
 
-def get_style_css(ctx, node, embed=True):
+def get_style_css(ctx, node, embed=True, fontsize=-1):
     """Returns as string defined CSS for this node.
 
     Defined CSS can be different if it is embeded or no. When it is embeded styling 
@@ -393,59 +393,60 @@ def get_style_css(ctx, node, embed=True):
     if not node:
         return
 
-    # temporarily
-    if not embed:
-        if 'b' in node.rpr:
-            style.append('font-weight: bold')
+    if fontsize in [-1, 2]:
+        if 'sz' in node.rpr:
+            size = int(node.rpr['sz']) / 2
 
-        if 'i' in node.rpr:
-            style.append('font-style: italic')
+            if ctx.options['embed_fontsize']:
+                if ctx.options['scale_to_size']:                
+                    multiplier = size-ctx.options['scale_to_size']
+                    scale = 100 + int(math.trunc(8.3*multiplier))
+                    style.append('font-size: {}%'.format(scale))
+                else:
+                    style.append('font-size: {}pt'.format(size))
 
-        if 'u' in node.rpr:
-            style.append('text-decoration: underline')
+    if fontsize in [-1, 1]:
+        # temporarily
+        if not embed:
+            if 'b' in node.rpr:
+                style.append('font-weight: bold')
 
-    if 'small_caps' in node.rpr:
-        style.append('font-variant: small-caps')
+            if 'i' in node.rpr:
+                style.append('font-style: italic')
 
-    if 'strike' in node.rpr:
-        style.append('text-decoration: line-through')
+            if 'u' in node.rpr:
+                style.append('text-decoration: underline')
 
-    if 'color' in node.rpr:
-        if node.rpr['color'] != '000000':
-            style.append('color: #{}'.format(node.rpr['color']))
+        if 'small_caps' in node.rpr:
+            style.append('font-variant: small-caps')
 
-    if 'jc' in node.ppr:
-        # left right both
-        align = node.ppr['jc']
-        if align.lower() == 'both':
-            align = 'justify'
+        if 'strike' in node.rpr:
+            style.append('text-decoration: line-through')
 
-        style.append('text-align: {}'.format(align))
+        if 'color' in node.rpr:
+            if node.rpr['color'] != '000000':
+                style.append('color: #{}'.format(node.rpr['color']))
 
-    if 'sz' in node.rpr:
-        size = int(node.rpr['sz']) / 2
+        if 'jc' in node.ppr:
+            # left right both
+            align = node.ppr['jc']
+            if align.lower() == 'both':
+                align = 'justify'
 
-        if ctx.options['embed_fontsize']:
-            if ctx.options['scale_to_size']:                
-                multiplier = size-ctx.options['scale_to_size']
-                scale = 100 + int(math.trunc(8.3*multiplier))
-                style.append('font-size: {}%'.format(scale))
-            else:
-                style.append('font-size: {}pt'.format(size))
+            style.append('text-align: {}'.format(align))
 
-    if 'ind' in node.ppr:
-        if 'left' in node.ppr['ind']:
-            size = int(node.ppr['ind']['left']) / 10
-            style.append('margin-left: {}px'.format(size))
+        if 'ind' in node.ppr:
+            if 'left' in node.ppr['ind']:
+                size = int(node.ppr['ind']['left']) / 10
+                style.append('margin-left: {}px'.format(size))
 
-        if 'right' in node.ppr['ind']:
-            size = int(node.ppr['ind']['right']) / 10
-            style.append('margin-right: {}px'.format(size))
+            if 'right' in node.ppr['ind']:
+                size = int(node.ppr['ind']['right']) / 10
+                style.append('margin-right: {}px'.format(size))
 
-        if 'first_line' in node.ppr['ind']:
-            size = int(node.ppr['ind']['first_line']) / 10
-            style.append('text-indent: {}px'.format(size))
-
+            if 'first_line' in node.ppr['ind']:
+                size = int(node.ppr['ind']['first_line']) / 10
+                style.append('text-indent: {}px'.format(size))
 
     if len(style) == 0:
         return ''
@@ -516,7 +517,10 @@ def get_css_classes(document, style):
     >>> get_css_classes(doc, st)
     'header1 normal'
     """
-    return ' '.join([st.lower() for st in get_all_styles(document, style)[-1:]])
+    lst = [st.lower() for st in get_all_styles(document, style)[-1:]] + \
+        ['{}-fontsize'.format(st.lower()) for st in get_all_styles(document, style)[-1:]]
+
+    return ' '.join(lst)
 
 
 def serialize_paragraph(ctx, document, par, root, embed=True):
@@ -600,8 +604,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
 
             if ctx.options['embed_styles']:
-                if _text_style != '':
+                if _text_style != '' and _style != _text_style:
                     new_element.set('style', _text_style)
+
             # This is for situations when style has options and
             # text is trying to unset them
             # else:            
@@ -612,15 +617,17 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             if len(children) > 0:
                 _child_style = children[-1].get('style') or ''
-                
-                if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail is None:
+
+                if new_element.tag == children[-1].tag and (_text_style == _child_style or _child_style == '') and children[-1].tail is None:
                     txt = children[-1].text or ''
                     txt2 = new_element.text or ''
                     children[-1].text = u'{}{}'.format(txt, txt2)  
                     was_inserted = True
 
                 if not was_inserted:
-                    if _style == '' and _text_style == '' and new_element.tag == 'span':
+#                    if _style == '' and _text_style == '' and new_element.tag == 'span':
+                    if _style == _text_style  and new_element.tag == 'span':
+
                         _e = children[-1]
 
                         txt = _e.tail or ''
@@ -628,7 +635,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                         was_inserted = True
 
             if not was_inserted:
-                if _style == '' and _text_style == '' and new_element.tag == 'span':
+#                if _style == '' and _text_style == '' and new_element.tag == 'span':
+                if _style ==  _text_style  and new_element.tag == 'span':
+
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
@@ -1173,9 +1182,11 @@ def serialize_styles(document, prefix='', options=None):
             else:
                 break
 
-        content = "\n".join([get_style_css(ctx, st, embed=False) for st in styles])
-
+        content = "\n".join([get_style_css(ctx, st, embed=False, fontsize=1) for st in styles])
         css_content += "{0} .{1} {{ {2} }}\n\n".format(prefix, style_id.lower(), content)
+
+        content = "\n".join([get_style_css(ctx, st, embed=False, fontsize=2) for st in styles])
+        css_content += "{0} .{1}-fontsize {{ {2} }}\n\n".format(prefix, style_id.lower(), content)
 
     return css_content
 
