@@ -604,8 +604,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
 
             if ctx.options['embed_styles']:
-                if _text_style != '':
+                if _text_style != '' and _style != _text_style:
                     new_element.set('style', _text_style)
+
             # This is for situations when style has options and
             # text is trying to unset them
             # else:            
@@ -616,15 +617,17 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             if len(children) > 0:
                 _child_style = children[-1].get('style') or ''
-                
-                if new_element.tag == children[-1].tag and _text_style == _child_style and children[-1].tail is None:
+
+                if new_element.tag == children[-1].tag and (_text_style == _child_style or _child_style == '') and children[-1].tail is None:
                     txt = children[-1].text or ''
                     txt2 = new_element.text or ''
                     children[-1].text = u'{}{}'.format(txt, txt2)  
                     was_inserted = True
 
                 if not was_inserted:
-                    if _style == '' and _text_style == '' and new_element.tag == 'span':
+#                    if _style == '' and _text_style == '' and new_element.tag == 'span':
+                    if _style == _text_style  and new_element.tag == 'span':
+
                         _e = children[-1]
 
                         txt = _e.tail or ''
@@ -632,7 +635,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                         was_inserted = True
 
             if not was_inserted:
-                if _style == '' and _text_style == '' and new_element.tag == 'span':
+#                if _style == '' and _text_style == '' and new_element.tag == 'span':
+                if _style ==  _text_style  and new_element.tag == 'span':
+
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
