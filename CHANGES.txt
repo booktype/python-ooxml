@@ -1,3 +1,12 @@
+0.12 (2015-03-25)
+=================
+
+- Fix style embedding
+- Fix parsing
+- Fix bugs in serialization
+- Support for comments
+- Better calculate base font
+
 0.11 (2014-11-24)
 ==================
 

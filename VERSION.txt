@@ -1,1 +1,1 @@
-Python-OOXML 0.11
+Python-OOXML 0.12
