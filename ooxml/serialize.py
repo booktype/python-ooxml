@@ -560,6 +560,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         if isinstance(el, doc.Text):
             children = list(elem)
             _text_style = get_style_css(ctx, el)
+            _text_class = el.rpr.get('style', '')
 
             if get_style_fontsize(el) > max_font_size:
                 max_font_size = get_style_fontsize(el)
@@ -598,6 +599,11 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             else:
                 new_element = etree.Element('span')
                 new_element.text = el.value()
+                if ctx.options['embed_styles']:
+                    try:
+                        new_element.set('class', el.rpr['style'].lower())
+                    except:
+                        pass
 
                 for comment_id in ctx.opened_comments:
                     document.comments[comment_id].text += ' ' + el.value()
@@ -614,11 +620,11 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             was_inserted = False
 
-
             if len(children) > 0:
                 _child_style = children[-1].get('style') or ''
+                _child_class = new_element.get('class', '')
 
-                if new_element.tag == children[-1].tag and (_text_style == _child_style or _child_style == '') and children[-1].tail is None:
+                if new_element.tag == children[-1].tag and ((_text_class == _child_class or _child_class == '') and (_text_style == _child_style or _child_style == '')) and children[-1].tail is None:
                     txt = children[-1].text or ''
                     txt2 = new_element.text or ''
                     children[-1].text = u'{}{}'.format(txt, txt2)  
@@ -627,7 +633,6 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                 if not was_inserted:
 #                    if _style == '' and _text_style == '' and new_element.tag == 'span':
                     if _style == _text_style  and new_element.tag == 'span':
-
                         _e = children[-1]
 
                         txt = _e.tail or ''
@@ -637,7 +642,6 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             if not was_inserted:
 #                if _style == '' and _text_style == '' and new_element.tag == 'span':
                 if _style ==  _text_style  and new_element.tag == 'span':
-
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
