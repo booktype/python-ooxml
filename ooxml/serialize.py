@@ -631,8 +631,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                     was_inserted = True
 
                 if not was_inserted:
-#                    if _style == '' and _text_style == '' and new_element.tag == 'span':
-                    if _style == _text_style  and new_element.tag == 'span':
+                    if _style == _text_style  and new_element.tag == 'span' and (_text_class == _child_class or _child_class == ''):
                         _e = children[-1]
 
                         txt = _e.tail or ''
@@ -640,8 +639,9 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                         was_inserted = True
 
             if not was_inserted:
-#                if _style == '' and _text_style == '' and new_element.tag == 'span':
-                if _style ==  _text_style  and new_element.tag == 'span':
+                _child_class = new_element.get('class', '')
+
+                if _style ==  _text_style  and new_element.tag == 'span' and (_text_class == _child_class or _child_class == '') :
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
