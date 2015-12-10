@@ -560,7 +560,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
         if isinstance(el, doc.Text):
             children = list(elem)
             _text_style = get_style_css(ctx, el)
-            _text_class = el.rpr.get('style', '')
+            _text_class = el.rpr.get('style', '').lower()
 
             if get_style_fontsize(el) > max_font_size:
                 max_font_size = get_style_fontsize(el)
@@ -599,15 +599,16 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             else:
                 new_element = etree.Element('span')
                 new_element.text = el.value()
+
                 if ctx.options['embed_styles']:
                     try:
-                        new_element.set('class', el.rpr['style'].lower())
+                        new_element.set('class', _text_class)
                     except:
                         pass
 
                 for comment_id in ctx.opened_comments:
-                    document.comments[comment_id].text += ' ' + el.value()
-
+                    if comment_id in document.comments:
+                        document.comments[comment_id].text += ' ' + el.value()
 
             if ctx.options['embed_styles']:
                 if _text_style != '' and _style != _text_style:
@@ -622,7 +623,7 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
 
             if len(children) > 0:
                 _child_style = children[-1].get('style') or ''
-                _child_class = new_element.get('class', '')
+                _child_class = children[-1].get('class', '')
 
                 if new_element.tag == children[-1].tag and ((_text_class == _child_class or _child_class == '') and (_text_style == _child_style or _child_style == '')) and children[-1].tail is None:
                     txt = children[-1].text or ''
@@ -637,15 +638,26 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
                         txt = _e.tail or ''
                         _e.tail = u'{}{}'.format(txt, new_element.text)
                         was_inserted = True
+  
+                    if not was_inserted and new_element.tag == 'span' and (_text_class != _child_class):
+                        _e = children[-1]
+                        txt = _e.tail or ''
+                        _e.tail = u'{}{}'.format(txt, new_element.text)
+                        was_inserted = True       
 
             if not was_inserted:
                 _child_class = new_element.get('class', '')
+                try:
+                    _child_class = children[-1].get('class', '')
+                except:
+                    _child_class = ''
 
-                if _style ==  _text_style  and new_element.tag == 'span' and (_text_class == _child_class or _child_class == '') :
+                if _style ==  _text_style  and new_element.tag == 'span' and (_text_class == _child_class):
                     txt = elem.text or ''
                     elem.text = u'{}{}'.format(txt, new_element.text)
                 else:
-                    elem.append(new_element)
+                    if new_element.text != u'':
+                        elem.append(new_element)
     
     if not par.is_dropcap() and par.ilvl == None:
         if style:
