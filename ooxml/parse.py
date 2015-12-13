@@ -471,7 +471,7 @@ def parse_document(xmlcontent):
     return document
 
 
-def parse_relationship(document, xmlcontent):
+def parse_relationship(document, xmlcontent, rel_type):
     """Parse relationship document.
 
     Relationships hold information like external or internal references for links.
@@ -487,7 +487,7 @@ def parse_relationship(document, xmlcontent):
                    'type': elem.attrib['Type'],
                    'target_mode': elem.attrib.get('TargetMode', 'Internal')}
 
-            document.relationships[elem.attrib['Id']] = rel
+            document.relationships[rel_type][elem.attrib['Id']] = rel
 
 
 def parse_style(document, xmlcontent):
@@ -670,9 +670,15 @@ def parse_from_file(file_object):
 
     try:        
         doc_rel_content = file_object.read_file('_rels/document.xml.rels')
-        parse_relationship(document, doc_rel_content)
+        parse_relationship(document, doc_rel_content, 'document')
     except KeyError:
-        logger.warning('Could not read relationships.')
+        logger.warning('Could not read document relationships.')
+
+    try:        
+        doc_rel_content = file_object.read_file('_rels/endnotes.xml.rels')
+        parse_relationship(document, doc_rel_content, 'endnotes')
+    except KeyError:
+        logger.warning('Could not read endnotes relationships.')
 
     try:    
         comments_content = file_object.read_file('comments.xml')
