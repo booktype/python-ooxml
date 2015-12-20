@@ -6,7 +6,6 @@
 
 """
 
-import zipfile
 import logging
 
 from lxml import etree
@@ -26,6 +25,7 @@ def _name(name):
     '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rStyle'
     """
     return name.format(**NAMESPACES)
+
 
 def is_on(value):
     return value in ['true', 'on', '1']
@@ -58,43 +58,43 @@ def parse_previous_properties(document, paragraph, prop):
         paragraph.rpr['sz'] = sz.attrib[_name('{{{w}}}val')]
 
         if isinstance(paragraph, doc.Text):
-            if not ('dropcap' in paragraph.ppr  and paragraph.ppr['dropcap']):
-                if paragraph.parent and hasattr(paragraph.parent, 'ppr') and (not ('dropcap' in paragraph.parent.ppr  and paragraph.parent.ppr['dropcap'])):
-                    document.add_font_as_used(paragraph.rpr['sz'])            
+            if not ('dropcap' in paragraph.ppr and paragraph.ppr['dropcap']):
+                if paragraph.parent and hasattr(paragraph.parent, 'ppr') and (not ('dropcap' in paragraph.parent.ppr and paragraph.parent.ppr['dropcap'])):
+                    document.add_font_as_used(paragraph.rpr['sz'])
         elif isinstance(paragraph, doc.Paragraph):
-            if not ('dropcap' in paragraph.ppr  and paragraph.ppr['dropcap']):
+            if not ('dropcap' in paragraph.ppr and paragraph.ppr['dropcap']):
                 document.add_font_as_used(paragraph.rpr['sz'])
         else:
-            document.add_font_as_used(paragraph.rpr['sz']) 
+            document.add_font_as_used(paragraph.rpr['sz'])
 
     # parse bold
     b = prop.find(_name('{{{w}}}b'))
 
-    if b is not None:        
+    if b is not None:
         if is_on(b.attrib.get(_name('{{{w}}}val'), 'on')):
             paragraph.rpr['b'] = True
 
     # parse italic
     i = prop.find(_name('{{{w}}}i'))
 
-    if i is not None:        
-        if is_on(i.attrib.get(_name('{{{w}}}val'), 'on')):        
+    if i is not None:
+        if is_on(i.attrib.get(_name('{{{w}}}val'), 'on')):
             paragraph.rpr['i'] = True
 
     # parse underline
     u = prop.find(_name('{{{w}}}u'))
 
-    if u is not None:        
-        if is_on(u.attrib.get(_name('{{{w}}}val'), 'on')):                
+    if u is not None:
+        if is_on(u.attrib.get(_name('{{{w}}}val'), 'on')):
             paragraph.rpr['u'] = True
 
     # parse underline
     strike = prop.find(_name('{{{w}}}strike'))
 
-    if strike is not None:        
+    if strike is not None:
         # todo
         # check b = on and not off
-        if is_on(strike.attrib.get(_name('{{{w}}}val'), 'on')):                        
+        if is_on(strike.attrib.get(_name('{{{w}}}val'), 'on')):
             paragraph.rpr['strike'] = True
 
     vert_align = prop.find(_name('{{{w}}}vertAlign'))
@@ -149,7 +149,7 @@ def parse_paragraph_properties(doc, paragraph, prop):
 
     if ind is not None:
         paragraph.ppr['ind'] = {}
-        
+
         if _name('{{{w}}}left') in ind.attrib:
             paragraph.ppr['ind']['left'] = ind.attrib[_name('{{{w}}}left')]
 
@@ -184,7 +184,7 @@ def parse_drawing(document, container, elem):
 
     if len(_blip) > 0:
         blip = _blip[0]
-        _rid =  blip.attrib[_name('{{{r}}}embed')]
+        _rid = blip.attrib[_name('{{{r}}}embed')]
 
         img = doc.Image(_rid)
         container.elements.append(img)
@@ -193,8 +193,7 @@ def parse_drawing(document, container, elem):
 def parse_footnote(document, container, elem):
     "Parse the footnote element."
 
-    _rid =  elem.attrib[_name('{{{w}}}id')]
-
+    _rid = elem.attrib[_name('{{{w}}}id')]
     foot = doc.Footnote(_rid)
     container.elements.append(foot)
 
@@ -202,14 +201,13 @@ def parse_footnote(document, container, elem):
 def parse_endnote(document, container, elem):
     "Parse the endnote element."
 
-    _rid =  elem.attrib[_name('{{{w}}}id')]
-
+    _rid = elem.attrib[_name('{{{w}}}id')]
     note = doc.Endnote(_rid)
     container.elements.append(note)
 
 
 def parse_alternate(document, container, elem):
-    txtbx = elem.find('.//'+_name('{{{w}}}txbxContent'))
+    txtbx = elem.find('.//' + _name('{{{w}}}txbxContent'))
     paragraphs = []
 
     if txtbx is None:
@@ -221,7 +219,7 @@ def parse_alternate(document, container, elem):
 
     textbox = doc.TextBox(paragraphs)
     container.elements.append(textbox)
-    
+
 
 def parse_text(document, container, element):
     "Parse text element."
@@ -237,7 +235,7 @@ def parse_text(document, container, element):
 
     if br is not None:
         if _name('{{{w}}}type') in br.attrib:
-            _type = br.attrib[_name('{{{w}}}type')]        
+            _type = br.attrib[_name('{{{w}}}type')]
             brk = doc.Break(_type)
         else:
             brk = doc.Break()
@@ -302,10 +300,10 @@ def parse_smarttag(document, container, tag_elem):
 
     for elem in tag_elem:
         if elem.tag == _name('{{{w}}}r'):
-            parse_text(document, tag, elem)      
+            parse_text(document, tag, elem)
 
         if elem.tag == _name('{{{w}}}smartTag'):
-            parse_smarttag(document, tag, elem)            
+            parse_smarttag(document, tag, elem)
 
     container.elements.append(tag)
 
@@ -318,7 +316,7 @@ def parse_paragraph(document, par):
     Some other elements could be found inside of paragraph element (math, links).
     """
 
-    paragraph = doc.Paragraph()    
+    paragraph = doc.Paragraph()
     paragraph.document = document
 
     for elem in par:
@@ -326,7 +324,7 @@ def parse_paragraph(document, par):
             parse_paragraph_properties(document, paragraph, elem)
 
         if elem.tag == _name('{{{w}}}r'):
-            parse_text(document, paragraph, elem)      
+            parse_text(document, paragraph, elem)
 
         if elem.tag == _name('{{{m}}}oMath'):
             _m = doc.Math()
@@ -348,14 +346,14 @@ def parse_paragraph(document, par):
             try:
                 t = doc.Link(elem.attrib[_name('{{{r}}}id')])
 
-                parse_text(document, t, elem)            
+                parse_text(document, t, elem)
 
-                paragraph.elements.append(t)            
+                paragraph.elements.append(t)
             except:
                 logger.error('Error with with hyperlink [%s].', str(elem.attrib.items()))
 
         if elem.tag == _name('{{{w}}}smartTag'):
-            parse_smarttag(document, paragraph, elem)            
+            parse_smarttag(document, paragraph, elem)
 
     return paragraph
 
@@ -383,7 +381,6 @@ def parse_table_column_properties(doc, cell, prop):
 
     if grid is not None:
         cell.grid_span = int(grid.attrib[_name('{{{w}}}val')])
-
 
     vmerge = prop.find(_name('{{{w}}}vMerge'))
 
@@ -422,7 +419,7 @@ def parse_table(document, tbl):
         columns = []
         pos_x = 0
 
-        for tc in tr.xpath('./w:tc', namespaces=NAMESPACES):            
+        for tc in tr.xpath('./w:tc', namespaces=NAMESPACES):
             cell = doc.TableCell()
 
             tc_pr = tc.find(_name('{{{w}}}tcPr'))
@@ -451,7 +448,7 @@ def parse_document(xmlcontent):
 
     Content is placed in file 'document.xml'.
     """
-    
+
     document = etree.fromstring(xmlcontent)
 
     body = document.xpath('.//w:body', namespaces=NAMESPACES)[0]
@@ -498,9 +495,6 @@ def parse_style(document, xmlcontent):
 
     styles = etree.fromstring(xmlcontent)
 
-    # parse default styles
-    default_rpr = styles.find(_name('{{{w}}}rPrDefault'))
-
     _r = styles.xpath('.//w:rPrDefault', namespaces=NAMESPACES)
 
     if len(_r) > 0:
@@ -517,7 +511,7 @@ def parse_style(document, xmlcontent):
 
         st.style_id = style.attrib[_name('{{{w}}}styleId')]
 
-        style_type = style.attrib[_name('{{{w}}}type')]        
+        style_type = style.attrib[_name('{{{w}}}type')]
         if style_type is not None:
             st.style_type = style_type
 
@@ -545,11 +539,10 @@ def parse_style(document, xmlcontent):
         if rpr is not None:
             parse_previous_properties(document, st, rpr)
 
-
         ppr = style.find(_name('{{{w}}}pPr'))
 
         if ppr is not None:
-           parse_paragraph_properties(document, st, ppr)
+            parse_paragraph_properties(document, st, ppr)
 
 
 def parse_comments(document, xmlcontent):
@@ -628,7 +621,6 @@ def parse_numbering(document, xmlcontent):
         for lvl in abstruct_num.xpath('./w:lvl', namespaces=NAMESPACES):
             ilvl = int(lvl.attrib[_name('{{{w}}}ilvl')])
 
-
             fmt = lvl.find(_name('{{{w}}}numFmt'))
             numb[ilvl] = {'numFmt': fmt.attrib[_name('{{{w}}}val')]}
 
@@ -647,7 +639,7 @@ def parse_numbering(document, xmlcontent):
 def parse_from_file(file_object):
     """Parses existing OOXML file.
 
-    :Args: 
+    :Args:
       - file_object (:class:`ooxml.docx.DOCXFile`): OOXML file object
 
     :Returns:
@@ -658,51 +650,56 @@ def parse_from_file(file_object):
 
     # Read the files
     doc_content = file_object.read_file('document.xml')
-    
+
     # Parse the document
     document = parse_document(doc_content)
 
-    try:    
+    try:
         style_content = file_object.read_file('styles.xml')
-        parse_style(document, style_content)        
+        parse_style(document, style_content)
     except KeyError:
         logger.warning('Could not read styles.')
 
-    try:        
+    try:
         doc_rel_content = file_object.read_file('_rels/document.xml.rels')
         parse_relationship(document, doc_rel_content, 'document')
     except KeyError:
         logger.warning('Could not read document relationships.')
 
-    try:        
+    try:
         doc_rel_content = file_object.read_file('_rels/endnotes.xml.rels')
         parse_relationship(document, doc_rel_content, 'endnotes')
     except KeyError:
         logger.warning('Could not read endnotes relationships.')
 
-    try:    
+    try:
+        doc_rel_content = file_object.read_file('_rels/footnotes.xml.rels')
+        parse_relationship(document, doc_rel_content, 'footnotes')
+    except KeyError:
+        logger.warning('Could not read footnotes relationships.')
+
+    try:
         comments_content = file_object.read_file('comments.xml')
-        parse_comments(document, comments_content)    
+        parse_comments(document, comments_content)
     except KeyError:
-        logger.warning('Could not read footnotes.')
+        logger.warning('Could not read comments.')
 
-    try:    
+    try:
         footnotes_content = file_object.read_file('footnotes.xml')
-        parse_footnotes(document, footnotes_content)    
+        parse_footnotes(document, footnotes_content)
     except KeyError:
         logger.warning('Could not read footnotes.')
 
-    try:    
+    try:
         endnotes_content = file_object.read_file('endnotes.xml')
-        parse_endnotes(document, endnotes_content)    
+        parse_endnotes(document, endnotes_content)
     except KeyError:
         logger.warning('Could not read endnotes.')
 
     try:
         numbering_content = file_object.read_file('numbering.xml')
-        parse_numbering(document, numbering_content)    
+        parse_numbering(document, numbering_content)
     except KeyError:
         logger.warning('Could not read numbering.')
 
     return document
-
