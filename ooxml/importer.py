@@ -233,6 +233,7 @@ def find_important(ctx, doc, headers):
     for hdrs in HEADERS_IMPORTANCE:        
         lst = []
         for header in headers:
+            # BOD HAS THIS UNCOMMENTED
             # if header.get('page_break', False) == True:
             #     lst.append({'name': '', 'weight': 100000, 'index': header['index']})
             if header['name'] == '' and ('font_size' in header and header['font_size'] == hdrs[0]):
@@ -483,7 +484,9 @@ def get_chapters(doc, options=None, serialize_options=None):
             if chapters[n]['index'] == chapters[n+1]['index']-1:
                 _html = _serialize_chapter(idx, [doc.elements[chapters[n]['index']]], False)
             else:
-                _html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']-1], False)
+                _html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']], False)
+                # BOD HAS THIS COMMENTED
+                #_html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']-1], False)
             idx += 1
 
             export_chapters.append(_html)

@@ -290,7 +290,7 @@ def serialize_link(ctx, document, elem, root):
                     _text = children[-1].tail or u''
 
                     children[-1].tail = u'{}{}'.format(_text, el.value())
-
+   
     if elem.rid in document.relationships[ctx.options['relationship']]:
         _a.set('href', document.relationships[ctx.options['relationship']][elem.rid].get('target', ''))
 

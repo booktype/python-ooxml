@@ -194,7 +194,6 @@ def parse_footnote(document, container, elem):
     "Parse the footnote element."
 
     _rid =  elem.attrib[_name('{{{w}}}id')]
-
     foot = doc.Footnote(_rid)
     container.elements.append(foot)
 
@@ -203,7 +202,6 @@ def parse_endnote(document, container, elem):
     "Parse the endnote element."
 
     _rid =  elem.attrib[_name('{{{w}}}id')]
-
     note = doc.Endnote(_rid)
     container.elements.append(note)
 
@@ -680,11 +678,17 @@ def parse_from_file(file_object):
     except KeyError:
         logger.warning('Could not read endnotes relationships.')
 
+    #try:        
+    doc_rel_content = file_object.read_file('_rels/footnotes.xml.rels')
+    parse_relationship(document, doc_rel_content, 'footnotes')
+    #except KeyError:
+    #    logger.warning('Could not read footnotes relationships.')
+
     try:    
         comments_content = file_object.read_file('comments.xml')
         parse_comments(document, comments_content)    
     except KeyError:
-        logger.warning('Could not read footnotes.')
+        logger.warning('Could not read comments.')
 
     try:    
         footnotes_content = file_object.read_file('footnotes.xml')
@@ -705,4 +709,3 @@ def parse_from_file(file_object):
         logger.warning('Could not read numbering.')
 
     return document
-
