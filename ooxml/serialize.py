@@ -989,7 +989,7 @@ class HeaderContext:
                 except:
                     pass
 
-            sorted_list_of_sizes = list(collections.OrderedDict(sorted(list_of_sizes.iteritems(), key=lambda t: t[0])))
+            sorted_list_of_sizes = list(collections.OrderedDict(sorted(six.iteritems(list_of_sizes), key=lambda t: t[0])))
             font_size_to_check = font_size
 
             if len(sorted_list_of_sizes) > 0:
