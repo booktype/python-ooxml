@@ -160,7 +160,7 @@ class Document(object):
 
     def reset(self):
         self.elements = []
-        self.relationships = {'document': {}, 'endnotes': {}}
+        self.relationships = {'document': {}, 'endnotes': {}, 'footnotes': {}}
         self.footnotes = {}
         self.endnotes = {}
         self.comments = {}

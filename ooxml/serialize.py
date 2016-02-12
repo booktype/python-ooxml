@@ -290,7 +290,7 @@ def serialize_link(ctx, document, elem, root):
                     _text = children[-1].tail or u''
 
                     children[-1].tail = u'{}{}'.format(_text, el.value())
-
+   
     if elem.rid in document.relationships[ctx.options['relationship']]:
         _a.set('href', document.relationships[ctx.options['relationship']][elem.rid].get('target', ''))
 
@@ -550,7 +550,6 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
     if style:
         max_font_size = _get_font_size(document, style)
 
-        
     for el in par.elements:
         _serializer =  ctx.get_serializer(el)
 
@@ -561,6 +560,11 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             children = list(elem)
             _text_style = get_style_css(ctx, el)
             _text_class = el.rpr.get('style', '').lower()
+
+            if _text_class == '':
+                __s = get_style(document, par)
+                if __s is not None:
+                    _text_class = get_style_name(__s).lower()
 
             if get_style_fontsize(el) > max_font_size:
                 max_font_size = get_style_fontsize(el)
@@ -599,7 +603,6 @@ def serialize_paragraph(ctx, document, par, root, embed=True):
             else:
                 new_element = etree.Element('span')
                 new_element.text = el.value()
-
                 if ctx.options['embed_styles']:
                     try:
                         new_element.set('class', _text_class)

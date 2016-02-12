@@ -483,7 +483,9 @@ def get_chapters(doc, options=None, serialize_options=None):
             if chapters[n]['index'] == chapters[n+1]['index']-1:
                 _html = _serialize_chapter(idx, [doc.elements[chapters[n]['index']]], False)
             else:
-                _html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']-1], False)
+                _html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']], False)
+                # BOD HAS THIS COMMENTED
+                #_html = _serialize_chapter(idx, doc.elements[chapters[n]['index']:chapters[n+1]['index']-1], False)
             idx += 1
 
             export_chapters.append(_html)
