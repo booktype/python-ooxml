@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name = 'Python-OOXML',
-    version = '0.12',
+    version = '0.13',
 
     author = 'Aleksandar Erkalovic',
     author_email = 'aerkalov@gmail.com',

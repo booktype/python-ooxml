@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-VERSION = '0.12'
+VERSION = '0.13'
 
 NAMESPACES = {
     'mo': 'http://schemas.microsoft.com/office/mac/office/2008/main',
